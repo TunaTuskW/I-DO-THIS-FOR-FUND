@@ -2,11 +2,23 @@ import os
 import sys
 import requests
 
+def get_webhook_url():
+    # First, try to read from a local config file
+    config_path = os.path.join(os.path.dirname(__file__), "webhook_config.txt")
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            url = f.read().strip()
+            if url and not url.startswith("PASTE_YOUR_WEBHOOK_URL_HERE"):
+                return url
+                
+    # Fallback to environment variable
+    return os.environ.get("DISCORD_WEBHOOK_URL")
+
 def push_to_discord(file_path):
-    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+    webhook_url = get_webhook_url()
     if not webhook_url:
-        print("Error: DISCORD_WEBHOOK_URL environment variable is not set.")
-        print("Please set it by running: export DISCORD_WEBHOOK_URL='your_webhook_url_here'")
+        print("Error: Discord Webhook URL is not set.")
+        print("Please paste your URL into the 'webhook_config.txt' file.")
         sys.exit(1)
         
     if not os.path.exists(file_path):
@@ -16,7 +28,6 @@ def push_to_discord(file_path):
     filename = os.path.basename(file_path)
     
     # We send a notification message and attach the file
-    # This avoids Discord's 2000 character limit for large reports
     payload = {
         "content": f"📄 **New Macro Report:** {filename}"
     }
