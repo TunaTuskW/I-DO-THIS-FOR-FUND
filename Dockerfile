@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 
 COPY src/ ./src/
 COPY config/ ./config/
-COPY data/ ./data/
+COPY models/ ./models/
 
 ENV PYTHONPATH=/app
 EXPOSE 8000
