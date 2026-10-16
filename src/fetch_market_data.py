@@ -1,4 +1,11 @@
 import os
+import sys
+
+# Ensure repository root is in sys.path
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 import json
 import argparse
 import traceback
@@ -25,7 +32,7 @@ from src.engines.smc_engine import SMCEngine
 from src.engines.session_engine import SessionEngine
 from src.engines.liquidity_engine import LiquidityEngine
 from src.engines.opportunity_gate import OpportunityGate
-from src.engines.regime_ensemble import RegimeEnsemble
+from src.engines.regime_ensemble import RegimeEnsemble, run_kalman_filter, compute_mcs
 from src.engines.risk_engine import RiskEngine
 from src.engines.consensus_engine import ConsensusEngine
 from src.engines.entry_engine import EntryEngine
@@ -545,6 +552,44 @@ class Conductor:
             except Exception as e:
                 logger.error(f"Failed to read entry score for risk engine: {e}")
 
+        # Update Kalman State & MCS prior to risk sizing
+        try:
+            mcs_val, mcs_components = compute_mcs(self.clean_daily, self.bonds, self.clean_daily)
+            sub_vals = np.array([abs(float(v)) for v in mcs_components.values()]) if mcs_components else np.array([])
+            if len(sub_vals) > 0 and sub_vals.sum() > 0:
+                norm_vals = sub_vals / sub_vals.sum()
+                mcs_entropy = float(self.risk_engine.compute_shannon_entropy(norm_vals))
+                mcs_entropy_vec = [round(float(v), 3) for v in norm_vals]
+            else:
+                mcs_entropy = 0.0
+                mcs_entropy_vec = [0.25, 0.25, 0.25, 0.25]
+
+            self.snapshot.mcs = {
+                "score": mcs_val,
+                "sub_components": mcs_components,
+                "entropy": mcs_entropy,
+                "entropy_vector": mcs_entropy_vec
+            }
+
+            hmm_probs = self.snapshot.regime.probabilities
+            if not hmm_probs and "SPX" in self.snapshot.assets:
+                hmm_probs = self.snapshot.assets["SPX"].get("regime", {}).get("probabilities", {})
+
+            prior_probs = self.snapshot.kalman_state.probabilities if self.snapshot.kalman_state else None
+            prior_cov = self.snapshot.kalman_state.covariance_matrix if self.snapshot.kalman_state else None
+
+            k_state = run_kalman_filter(
+                mcs=mcs_val,
+                sub_components=mcs_components,
+                hmm_regime_probs=hmm_probs or {"NEUTRAL_TRANSITIONAL": 1.0},
+                prior_state=prior_probs,
+                prior_cov=prior_cov
+            )
+            k_state.brier_score_calibration = brier_score
+            self.snapshot.kalman_state = k_state
+        except Exception as e:
+            logger.error(f"Pre-sizing Kalman/MCS evaluation failed: {e}")
+
         # --- Sizing: RL Agent or Kelly (feature-flagged) ---
         kelly = None
         if self.use_rl_agent and self.rl_agent and self.rl_agent.is_loaded():
@@ -627,6 +672,64 @@ class Conductor:
         self.event_bus.publish("EnginesCompleted", {})
 
     def handle_engines_completed(self, payload):
+        # Properly invoke run_kalman_filter() and compute_mcs() from src.engines.regime_ensemble
+        try:
+            mcs_val, mcs_components = compute_mcs(self.clean_daily, self.bonds, self.clean_daily)
+            sub_vals = np.array([abs(float(v)) for v in mcs_components.values()]) if mcs_components else np.array([])
+            if len(sub_vals) > 0 and sub_vals.sum() > 0:
+                norm_vals = sub_vals / sub_vals.sum()
+                mcs_entropy = float(self.risk_engine.compute_shannon_entropy(norm_vals))
+                mcs_entropy_vec = [round(float(v), 3) for v in norm_vals]
+            else:
+                mcs_entropy = 0.0
+                mcs_entropy_vec = [0.25, 0.25, 0.25, 0.25]
+
+            self.snapshot.mcs = {
+                "score": mcs_val,
+                "sub_components": mcs_components,
+                "entropy": mcs_entropy,
+                "entropy_vector": mcs_entropy_vec
+            }
+
+            hmm_probs = self.snapshot.regime.probabilities
+            if not hmm_probs and "SPX" in self.snapshot.assets:
+                hmm_probs = self.snapshot.assets["SPX"].get("regime", {}).get("probabilities", {})
+
+            prior_probs = self.snapshot.kalman_state.probabilities if self.snapshot.kalman_state else None
+            prior_cov = self.snapshot.kalman_state.covariance_matrix if self.snapshot.kalman_state else None
+
+            k_state = run_kalman_filter(
+                mcs=mcs_val,
+                sub_components=mcs_components,
+                hmm_regime_probs=hmm_probs or {"NEUTRAL_TRANSITIONAL": 1.0},
+                prior_state=prior_probs,
+                prior_cov=prior_cov
+            )
+            if self.snapshot.kalman_state and hasattr(self.snapshot.kalman_state, 'brier_score_calibration'):
+                k_state.brier_score_calibration = self.snapshot.kalman_state.brier_score_calibration
+            self.snapshot.kalman_state = k_state
+            logger.info(f"Conductor: Kalman state updated to {k_state.dominant_state} (prob: {k_state.dominant_prob:.2f})")
+        except Exception as e:
+            logger.error(f"Failed to execute Kalman filter or MCS in handle_engines_completed: {e}")
+
+        # Propagate Kalman state probabilities, dominant state, and MCS to opportunity_state.json
+        try:
+            opp_state = {}
+            if os.path.exists(self.opportunity_state_path):
+                with open(self.opportunity_state_path, "r") as f:
+                    opp_state = json.load(f)
+            opp_state.update({
+                "prev_entry_score": self.prev_entry_score if self.prev_entry_score is not None else opp_state.get("prev_entry_score", 0.5),
+                "prev_regime": getattr(self.snapshot.regime, 'current', 'UNKNOWN') if hasattr(self.snapshot, 'regime') and self.snapshot.regime else "UNKNOWN",
+                "kalman_dominant_state": self.snapshot.kalman_state.dominant_state if hasattr(self.snapshot, 'kalman_state') and self.snapshot.kalman_state else "neutral",
+                "kalman_probabilities": self.snapshot.kalman_state.probabilities if hasattr(self.snapshot, 'kalman_state') and self.snapshot.kalman_state else None,
+                "mcs": self.snapshot.mcs if hasattr(self.snapshot, 'mcs') and self.snapshot.mcs else {},
+                "evaluated_utc": datetime.now(timezone.utc).isoformat()
+            })
+            atomic_json_write(opp_state, self.opportunity_state_path)
+        except Exception as e:
+            logger.error(f"Failed to propagate Kalman & MCS into opportunity_state.json: {e}")
+
         # --- Entry Quality Scoring (1H only) ---
         if self.interval == "1h" and hasattr(self, 'raw_hourly_data'):
             spx_1h_close = self.raw_hourly_data["^GSPC"]["Close"].dropna() if "^GSPC" in self.raw_hourly_data.columns.levels[0] else pd.Series()
@@ -952,6 +1055,9 @@ class Conductor:
                     atomic_json_write({
                         "prev_entry_score": self.prev_entry_score,
                         "prev_regime": self.prev_regime,
+                        "kalman_dominant_state": self.snapshot.kalman_state.dominant_state if hasattr(self.snapshot, 'kalman_state') and self.snapshot.kalman_state else "neutral",
+                        "kalman_probabilities": self.snapshot.kalman_state.probabilities if hasattr(self.snapshot, 'kalman_state') and self.snapshot.kalman_state else None,
+                        "mcs": self.snapshot.mcs if hasattr(self.snapshot, 'mcs') else {},
                         "evaluated_utc": datetime.now(timezone.utc).isoformat()
                     }, self.opportunity_state_path)
 

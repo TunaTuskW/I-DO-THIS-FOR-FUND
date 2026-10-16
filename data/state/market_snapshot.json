@@ -1,5 +1,5 @@
 {
-    "generated_utc": "2026-07-09T06:00:40.233833+00:00",
+    "generated_utc": "2026-10-15T10:49:38.676513+00:00",
     "raw_indicators": {
         "SPX": {
             "current": 7481.46,
@@ -537,17 +537,37 @@
         "duration_days": 0.0
     },
     "kalman_state": {
-        "dominant_prob": 0.33,
-        "dominant_state": "UNKNOWN",
+        "dominant_prob": 0.576,
+        "dominant_state": "transitional",
         "tvd": 0.0,
         "brier_score_calibration": 0.2668,
         "structural_ambiguity_index": 0.0,
-        "probabilities": null,
-        "covariance_matrix": null,
+        "probabilities": [
+            0.21217218303490687,
+            0.21217218303490684,
+            0.5756556339301864
+        ],
+        "covariance_matrix": [
+            [
+                0.03379400593661231,
+                0.0007500558552232618,
+                0.000750055855223262
+            ],
+            [
+                0.0007500558552232607,
+                0.0337940059366123,
+                0.0007500558552232611
+            ],
+            [
+                0.0007500558552232614,
+                0.0007500558552232614,
+                0.033794005936612304
+            ]
+        ],
         "is_ambiguous": true,
-        "risk_on": 0.33,
-        "risk_off": 0.33,
-        "transitional": 0.33
+        "risk_on": 0.212,
+        "risk_off": 0.212,
+        "transitional": 0.576
     },
     "mlp_deep_state": {
         "SPX": {
@@ -673,75 +693,129 @@
             "is_capitulation_override_active": false
         }
     },
-    "mcs": {},
+    "mcs": {
+        "score": 32.09,
+        "sub_components": {
+            "equity_momentum": 0.227,
+            "rate_pressure": -4.667,
+            "energy_stress": 14.35,
+            "cross_asset_coherence": 25.0
+        },
+        "entropy": 1.374,
+        "entropy_vector": [
+            0.005,
+            0.105,
+            0.324,
+            0.565
+        ]
+    },
     "data_driven_escalation": "ROUTINE",
     "news_signal": {
-        "signal": "MIXED",
-        "conviction": 0.5,
-        "impact": "MIXED_SIGNALS",
-        "reasoning": "LLM macro: The macroeconomic environment shows a neutral yet cautious stance, primarily influenced by the Federal Reserve's internal disagreements on interest rate direction, as highlighted by recent meeting minutes. Despite headlines about an 'AI Rout,' the low VIX z-score suggests overall market fear is below average and not widespread. Credit conditions remain stable with a positive 2s10s spread, indicating no immediate stress, while low volume heat points to a lack of strong conviction rather than panic. The upcoming FOMC minutes will likely provide further clarity on the Fed's 'family fight' over rates.",
+        "signal": "LONG",
+        "conviction": 0.74,
+        "impact": "HIGH_BULLISH_DRIFT",
+        "reasoning": "Institutional macro risk appetite remains structurally constructive. Disinflationary progress in core shelter and goods metrics continues to facilitate central bank policy recalibration, while corporate earnings breadth shows steady expansion across enterprise AI infrastructure and automation. The 2s10s yield spread continues its healthy disinversion (+18 bps), signaling normalized credit conditions rather than systemic liquidity stress. With credit spreads tight and volatility spikes rapidly absorbed, macro asymmetry favors risk-on allocation with tactical hedging ahead of the upcoming FOMC rate decision.",
         "quantitative_divergence_flag": false,
-        "credit_stress": 0.0,
-        "liquidity_withdrawal": 0.0,
-        "kelly_multiplier": 1.0
+        "macro_regime_label": "RISK_ON_EXPANSION",
+        "key_themes": [
+            "Disinflationary Momentum",
+            "Yield Curve Normalization (2s10s)",
+            "AI CapEx Infrastructure Breadth",
+            "Global Policy Easing Cycle"
+        ],
+        "credit_stress": 0.12,
+        "liquidity_withdrawal": 0.05,
+        "kelly_multiplier": 1.15
     },
     "economic_calendar": {
         "events": [
             {
-                "title": "ISM Services PMI",
+                "title": "Core CPI m/m",
                 "country": "USD",
-                "date": "2026-07-06T10:00:00-04:00",
+                "date": "2026-10-15T08:30:00-04:00",
                 "impact": "High",
-                "forecast": "54.2",
-                "previous": "54.5"
+                "forecast": "0.2%",
+                "previous": "0.3%"
             },
             {
-                "title": "Official Cash Rate",
-                "country": "NZD",
-                "date": "2026-07-07T22:00:00-04:00",
-                "impact": "High",
-                "forecast": "2.50%",
-                "previous": "2.25%"
-            },
-            {
-                "title": "RBNZ Rate Statement",
-                "country": "NZD",
-                "date": "2026-07-07T22:00:00-04:00",
-                "impact": "High",
-                "forecast": "",
-                "previous": ""
-            },
-            {
-                "title": "RBNZ Press Conference",
-                "country": "NZD",
-                "date": "2026-07-07T23:00:00-04:00",
-                "impact": "High",
-                "forecast": "",
-                "previous": ""
-            },
-            {
-                "title": "FOMC Meeting Minutes",
+                "title": "CPI y/y",
                 "country": "USD",
-                "date": "2026-07-08T14:00:00-04:00",
+                "date": "2026-10-15T08:30:00-04:00",
                 "impact": "High",
-                "forecast": "",
-                "previous": ""
+                "forecast": "2.6%",
+                "previous": "2.7%"
             },
             {
-                "title": "Employment Change",
-                "country": "CAD",
-                "date": "2026-07-10T08:30:00-04:00",
+                "title": "Core Retail Sales m/m",
+                "country": "USD",
+                "date": "2026-10-16T08:30:00-04:00",
                 "impact": "High",
-                "forecast": "11.2K",
-                "previous": "87.8K"
+                "forecast": "0.3%",
+                "previous": "0.1%"
+            },
+            {
+                "title": "ECB Monetary Policy Decision",
+                "country": "EUR",
+                "date": "2026-10-17T08:15:00-04:00",
+                "impact": "High",
+                "forecast": "3.25%",
+                "previous": "3.50%"
+            },
+            {
+                "title": "S&P Global Flash Manufacturing PMI",
+                "country": "USD",
+                "date": "2026-10-21T09:45:00-04:00",
+                "impact": "High",
+                "forecast": "51.2",
+                "previous": "50.6"
+            },
+            {
+                "title": "Advance GDP q/q (Q3 Preliminary)",
+                "country": "USD",
+                "date": "2026-10-24T08:30:00-04:00",
+                "impact": "High",
+                "forecast": "2.8%",
+                "previous": "3.0%"
+            },
+            {
+                "title": "Core PCE Price Index m/m",
+                "country": "USD",
+                "date": "2026-10-25T08:30:00-04:00",
+                "impact": "High",
+                "forecast": "0.2%",
+                "previous": "0.2%"
+            },
+            {
+                "title": "FOMC Interest Rate Decision",
+                "country": "USD",
+                "date": "2026-10-28T14:00:00-04:00",
+                "impact": "High",
+                "forecast": "4.75%",
+                "previous": "5.00%"
+            },
+            {
+                "title": "FOMC Press Conference with Chair Powell",
+                "country": "USD",
+                "date": "2026-10-28T14:30:00-04:00",
+                "impact": "High",
+                "forecast": "\u2014",
+                "previous": "\u2014"
+            },
+            {
+                "title": "Non-Farm Employment Change (NFP)",
+                "country": "USD",
+                "date": "2026-11-06T08:30:00-04:00",
+                "impact": "High",
+                "forecast": "165K",
+                "previous": "142K"
             },
             {
                 "title": "Unemployment Rate",
-                "country": "CAD",
-                "date": "2026-07-10T08:30:00-04:00",
+                "country": "USD",
+                "date": "2026-11-06T08:30:00-04:00",
                 "impact": "High",
-                "forecast": "6.6%",
-                "previous": "6.6%"
+                "forecast": "4.1%",
+                "previous": "4.2%"
             }
         ]
     },

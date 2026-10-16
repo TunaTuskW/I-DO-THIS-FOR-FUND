@@ -157,7 +157,7 @@ function MacroTabContent({ timeZone }) {
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>
                     Regime: <span style={{ color: 'var(--lime)' }}>{news_signal.macro_regime_label}</span>
                   </span>
-                  {news_signal?.key_themes?.map((t, i) => (
+                  {Array.isArray(news_signal?.key_themes) && news_signal.key_themes.map((t, i) => (
                     <span key={i} style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(184,245,66,0.08)', color: 'var(--lime-soft)', fontFamily: 'JetBrains Mono' }}>
                       {t}
                     </span>
@@ -175,7 +175,7 @@ function MacroTabContent({ timeZone }) {
            Upcoming High-Impact Events
         </h2>
 
-        {(!economic_calendar?.events || economic_calendar.events.length === 0) ? (
+        {(!Array.isArray(economic_calendar?.events) || economic_calendar.events.length === 0) ? (
           <p className="text-muted" style={{ marginTop: '14px', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>
             No high-impact events in the current window.
           </p>
@@ -192,15 +192,16 @@ function MacroTabContent({ timeZone }) {
                 </tr>
               </thead>
               <tbody>
-                {economic_calendar.events.map((evt, i) => {
-                  const d = new Date(evt.date);
+                {economic_calendar?.events?.map((evt, i) => {
+                  if (!evt) return null;
+                  const d = evt.date ? new Date(evt.date) : null;
                   return (
                     <tr key={i} className="table-row-item" style={{ borderBottom: '1px solid rgba(184,245,66,0.04)' }}>
                       <td style={{ padding: '14px 12px', color: 'var(--text-main)' }}>
-                        {formatTimeToggle(d, timeZone)}
+                        {d ? formatTimeToggle(d, timeZone) : '—'}
                       </td>
-                      <td style={{ padding: '14px 12px', fontWeight: 700, color: 'var(--pink-soft)' }}>{evt.country}</td>
-                      <td style={{ padding: '14px 12px', color: 'var(--text-main)' }}>{evt.title}</td>
+                      <td style={{ padding: '14px 12px', fontWeight: 700, color: 'var(--pink-soft)' }}>{evt.country || '—'}</td>
+                      <td style={{ padding: '14px 12px', color: 'var(--text-main)' }}>{evt.title || '—'}</td>
                       <td style={{ padding: '14px 12px', color: 'var(--lime-soft)' }}>{evt.forecast || '—'}</td>
                       <td style={{ padding: '14px 12px' }} className="text-muted">{evt.previous || '—'}</td>
                     </tr>

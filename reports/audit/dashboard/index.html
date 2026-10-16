@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuantOS — Interactive Visual Audit Matrix</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['"Inter"', 'sans-serif'],
+          },
+          colors: {
+            void: '#05070c',
+            surface: 'rgba(13, 19, 33, 0.75)',
+            'surface-bright': 'rgba(23, 32, 54, 0.85)',
+            'glass-border': 'rgba(255, 255, 255, 0.08)',
+            'glass-border-focus': 'rgba(0, 240, 255, 0.4)',
+            plasma: {
+              cyan: '#00f0ff',
+              green: '#00ff88',
+              amber: '#ffb000',
+              red: '#ff3366',
+              purple: '#bd00ff',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #05070c;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(0, 240, 255, 0.04) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(189, 0, 255, 0.04) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(0, 255, 136, 0.03) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+    .glass-card {
+      background: rgba(13, 19, 33, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-card:hover {
+      border-color: rgba(0, 240, 255, 0.25);
+      box-shadow: 0 12px 40px 0 rgba(0, 240, 255, 0.08);
+      transform: translateY(-2px);
+    }
+    .glass-header {
+      background: rgba(8, 12, 22, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+    }
+    .glow-red {
+      box-shadow: 0 0 20px rgba(255, 51, 102, 0.25);
+    }
+    .glow-green {
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.25);
+    }
+    .status-dot-pulse {
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(0, 255, 136, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070a12; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    
+    .badge-critical {
+      background: rgba(255, 51, 102, 0.15);
+      color: #ff4d79;
+      border: 1px solid rgba(255, 51, 102, 0.4);
+    }
+    .badge-high {
+      background: rgba(255, 176, 0, 0.15);
+      color: #ffb000;
+      border: 1px solid rgba(255, 176, 0, 0.4);
+    }
+    .badge-medium {
+      background: rgba(0, 240, 255, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(0, 240, 255, 0.35);
+    }
+    .badge-low {
+      background: rgba(148, 163, 184, 0.12);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 glass-header px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-600/30 border border-cyan-500/40 flex items-center justify-center font-mono font-bold text-cyan-400 text-lg shadow-lg">
+          Q
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              QuantOS <span class="text-xs px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800 font-mono">v7.0.0 AUDIT</span>
+            </h1>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/70 text-emerald-400 border border-emerald-800/80">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 status-dot-pulse"></span>
+              AST 100% Synced
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Interactive Full-Stack Codebase Audit Matrix & Remediation Engine</p>
+        </div>
+      </div>
+
+      <!-- Action Utilities -->
+      <div class="flex items-center gap-3 font-mono text-xs">
+        <button id="exportJsonBtn" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition flex items-center gap-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Export JSON
+        </button>
+        <button id="exportCsvBtn" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Export CSV
+        </button>
+        <button id="toggleRemediationDrawerBtn" class="px-3.5 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-black font-semibold transition flex items-center gap-2 shadow-lg">
+          <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          Action Checklist (<span id="remediatedCountBadge">0</span>/25)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- KPI Summary Metrics Grid -->
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <!-- Total Findings -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-cyan-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">Total Findings</span>
+        <div class="text-2xl font-bold text-white mt-1 font-mono" id="kpiTotal">25</div>
+        <span class="text-[11px] text-cyan-400 font-mono">100% Audited</span>
+      </div>
+
+      <!-- Critical Findings -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-rose-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">Critical</span>
+        <div class="text-2xl font-bold text-rose-400 mt-1 font-mono" id="kpiCritical">6</div>
+        <span class="text-[11px] text-rose-400/80 font-mono">Zero Tolerated</span>
+      </div>
+
+      <!-- High Findings -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-amber-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">High Risk</span>
+        <div class="text-2xl font-bold text-amber-400 mt-1 font-mono" id="kpiHigh">9</div>
+        <span class="text-[11px] text-amber-400/80 font-mono">Priority Fix</span>
+      </div>
+
+      <!-- Medium & Low Findings -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-sky-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">Med & Low</span>
+        <div class="text-2xl font-bold text-sky-400 mt-1 font-mono" id="kpiMedLow">10</div>
+        <span class="text-[11px] text-sky-400/80 font-mono">Code Health</span>
+      </div>
+
+      <!-- Remediation Progress -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-emerald-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">Resolved</span>
+        <div class="text-2xl font-bold text-emerald-400 mt-1 font-mono" id="kpiResolved">0</div>
+        <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2">
+          <div id="remediationProgressBar" class="bg-emerald-400 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- CodeGraph AST Integrity -->
+      <div class="glass-card rounded-xl p-4 relative overflow-hidden border-l-4 border-l-purple-500">
+        <span class="text-xs uppercase tracking-wider text-slate-400 font-mono">AST Nodes / Edges</span>
+        <div class="text-xl font-bold text-purple-400 mt-1 font-mono">861 / 1,591</div>
+        <span class="text-[11px] text-purple-300/80 font-mono">0 Unresolved Refs</span>
+      </div>
+    </section>
+
+    <!-- Controls, Search & Filter Bar -->
+    <section class="glass-card rounded-2xl p-6 space-y-4">
+      <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+        
+        <!-- Live Instant Search Bar -->
+        <div class="relative w-full md:w-96">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Search by symbol, ID, title, or file..." 
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-mono transition"
+          >
+          <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- View Mode Switcher -->
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <span class="text-slate-400">View:</span>
+          <div class="bg-slate-900 p-1 rounded-lg border border-slate-700 flex gap-1">
+            <button id="viewGridBtn" class="px-3 py-1 rounded bg-cyan-500/20 text-cyan-400 font-semibold border border-cyan-500/30">
+              Cards
+            </button>
+            <button id="viewTableBtn" class="px-3 py-1 rounded text-slate-400 hover:text-white">
+              Table
+            </button>
+          </div>
+
+          <!-- Sort Select -->
+          <select id="sortSelect" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-300 focus:outline-none focus:border-cyan-400">
+            <option value="severity">Sort: Severity (High-Low)</option>
+            <option value="id">Sort: Finding ID</option>
+            <option value="category">Sort: Domain</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Interactive Filter Pills -->
+      <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
+        <!-- Severity Filters -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-mono mr-4">
+          <span class="text-slate-500 mr-1 uppercase">Severity:</span>
+          <button data-filter-type="severity" data-filter-value="ALL" class="filter-pill active px-3 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/20 text-cyan-300 font-semibold">ALL (<span id="countSevAll">25</span>)</button>
+          <button data-filter-type="severity" data-filter-value="CRITICAL" class="filter-pill px-3 py-1 rounded-full border border-rose-500/30 bg-slate-900/60 hover:bg-rose-950/40 text-rose-400 font-medium">CRITICAL (<span id="countSevCrit">6</span>)</button>
+          <button data-filter-type="severity" data-filter-value="HIGH" class="filter-pill px-3 py-1 rounded-full border border-amber-500/30 bg-slate-900/60 hover:bg-amber-950/40 text-amber-400 font-medium">HIGH (<span id="countSevHigh">9</span>)</button>
+          <button data-filter-type="severity" data-filter-value="MEDIUM" class="filter-pill px-3 py-1 rounded-full border border-sky-500/30 bg-slate-900/60 hover:bg-sky-950/40 text-sky-400 font-medium">MEDIUM (<span id="countSevMed">7</span>)</button>
+          <button data-filter-type="severity" data-filter-value="LOW" class="filter-pill px-3 py-1 rounded-full border border-slate-600/40 bg-slate-900/60 hover:bg-slate-800 text-slate-400 font-medium">LOW (<span id="countSevLow">3</span>)</button>
+        </div>
+
+        <!-- Category Filters -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+          <span class="text-slate-500 mr-1 uppercase">Domain:</span>
+          <button data-filter-type="category" data-filter-value="ALL" class="category-pill active px-3 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/20 text-cyan-300 font-semibold">ALL DOMAINS</button>
+          <button data-filter-type="category" data-filter-value="AST" class="category-pill px-3 py-1 rounded-full border border-purple-500/30 bg-slate-900/60 hover:bg-purple-950/40 text-purple-300 font-medium">AST Architecture (5)</button>
+          <button data-filter-type="category" data-filter-value="Frontend" class="category-pill px-3 py-1 rounded-full border border-cyan-500/30 bg-slate-900/60 hover:bg-cyan-950/40 text-cyan-300 font-medium">Frontend React (8)</button>
+          <button data-filter-type="category" data-filter-value="Persistence" class="category-pill px-3 py-1 rounded-full border border-emerald-500/30 bg-slate-900/60 hover:bg-emerald-950/40 text-emerald-300 font-medium">Data Lake (6)</button>
+          <button data-filter-type="category" data-filter-value="Automation" class="category-pill px-3 py-1 rounded-full border border-amber-500/30 bg-slate-900/60 hover:bg-amber-950/40 text-amber-300 font-medium">Scheduler (6)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Findings Matrix: Grid View Container -->
+    <section id="findingsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Injected by JavaScript -->
+    </section>
+
+    <!-- Findings Matrix: Tabular View Container -->
+    <section id="findingsTable" class="hidden glass-card rounded-2xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs font-mono">
+          <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-700/80">
+            <tr>
+              <th class="p-4 w-12 text-center">Done</th>
+              <th class="p-4 w-28">ID</th>
+              <th class="p-4 w-24">Severity</th>
+              <th class="p-4 w-32">Domain</th>
+              <th class="p-4">Finding & Core Vulnerability</th>
+              <th class="p-4">Primary Affected Symbol</th>
+              <th class="p-4 w-24 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="findingsTableBody" class="divide-y divide-slate-800">
+            <!-- Injected by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden py-16 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-500">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h3 class="text-lg font-semibold text-white">No audit findings match your criteria</h3>
+      <p class="text-sm text-slate-400 mt-1">Try resetting filters or modifying your search query.</p>
+      <button id="resetFiltersBtn" class="mt-4 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-black font-semibold text-xs font-mono">
+        Reset All Filters
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Drill-Down Modal Dialog -->
+  <dialog id="detailModal" class="p-0 bg-transparent backdrop:bg-black/80 backdrop:backdrop-blur-sm z-50 max-w-3xl w-full rounded-2xl overflow-hidden focus:outline-none">
+    <div class="glass-card bg-[#0b101c]/95 border border-slate-700 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <span id="modalId" class="font-mono text-sm font-bold text-cyan-400">AUDIT-001</span>
+            <span id="modalSeverity" class="badge-critical text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold">CRITICAL</span>
+            <span id="modalCategory" class="text-xs px-2.5 py-0.5 rounded-full font-mono bg-purple-950/70 text-purple-300 border border-purple-800">AST</span>
+          </div>
+          <h2 id="modalTitle" class="text-xl font-bold text-white tracking-tight">Kalman Filter and MCS Pipeline Disconnection</h2>
+        </div>
+        <button id="closeModalBtn" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Affected Symbols Section -->
+      <div>
+        <h4 class="text-xs uppercase font-mono tracking-wider text-slate-400 mb-2">Affected Symbols & Entry Points</h4>
+        <div id="modalSymbols" class="flex flex-wrap gap-2">
+          <!-- Chips injected by JS -->
+        </div>
+      </div>
+
+      <!-- Concrete Code Evidence Section -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-xs uppercase font-mono tracking-wider text-slate-400">Concrete Code Evidence & AST Proof</h4>
+          <button id="copyEvidenceBtn" class="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Copy Evidence
+          </button>
+        </div>
+        <pre class="bg-black/70 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-pre-wrap selection:bg-emerald-900" id="modalEvidence"></pre>
+      </div>
+
+      <!-- Blast Radius Assessment -->
+      <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-900/40">
+        <h4 class="text-xs uppercase font-mono tracking-wider text-rose-400 mb-1 flex items-center gap-1.5 font-bold">
+          <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          Blast Radius Assessment & Architectural Coupling
+        </h4>
+        <p id="modalBlastRadius" class="text-xs text-slate-300 leading-relaxed font-sans"></p>
+      </div>
+
+      <!-- Step-by-Step Remediation Plan -->
+      <div>
+        <h4 class="text-xs uppercase font-mono tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Step-by-Step Remediation Plan
+        </h4>
+        <div id="modalRemediation" class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-xs text-slate-200 whitespace-pre-line leading-relaxed font-mono"></div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-slate-800 flex items-center justify-between">
+        <label class="flex items-center gap-2 cursor-pointer text-xs font-mono">
+          <input type="checkbox" id="modalCheckbox" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-cyan-400">
+          <span class="text-slate-300">Mark as Remediated in Action Checklist</span>
+        </label>
+        <button id="modalDoneBtn" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-black font-semibold text-xs font-mono transition">
+          Close Window
+        </button>
+      </div>
+
+    </div>
+  </dialog>
+
+  <!-- Slide-out Remediation Drawer -->
+  <aside id="remediationDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#0a0f1d] border-l border-slate-700/80 shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-bold text-white flex items-center gap-2 font-mono">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          Remediation Tracker
+        </h3>
+        <p class="text-xs text-slate-400 font-sans mt-0.5">Execution checklist for full engineering remediation</p>
+      </div>
+      <button id="closeDrawerBtn" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Progress Tracker -->
+    <div class="p-6 border-b border-slate-800/80 bg-slate-900/40">
+      <div class="flex items-center justify-between text-xs font-mono mb-2">
+        <span class="text-slate-400">Remediation Status:</span>
+        <span class="text-cyan-400 font-bold" id="drawerProgressText">0 / 25 Completed (0%)</span>
+      </div>
+      <div class="w-full bg-slate-800 rounded-full h-2">
+        <div id="drawerProgressBar" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Checklist Item List -->
+    <div id="drawerChecklist" class="flex-1 overflow-y-auto p-6 space-y-3 font-mono text-xs">
+      <!-- Injected by JS -->
+    </div>
+
+    <!-- Drawer Footer -->
+    <div class="p-6 border-t border-slate-800 bg-slate-900/60 flex gap-3">
+      <button id="markAllCompletedBtn" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300">
+        Mark All
+      </button>
+      <button id="resetChecklistBtn" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono text-rose-400">
+        Reset
+      </button>
+    </div>
+  </aside>
+
+  <!-- Embedded Audit Master Data & Application Logic -->
+  <script>
+    const AUDIT_DATA = [
+  {
+    "id": "AUDIT-001",
+    "category": "AST",
+    "severity": "CRITICAL",
+    "title": "Kalman Filter and MCS Pipeline Disconnection in Conductor",
+    "affected_symbols": [
+      "src/fetch_market_data.py:Conductor",
+      "src/engines/risk_engine.py:RiskEngine.compute_multi_asset_kelly",
+      "src/engines/feature_engine.py:compute_mcs"
+    ],
+    "evidence": "In src/fetch_market_data.py lines 514, 562, 646: self.snapshot.kalman_state is initialized to default KalmanState() and risk_engine.run_kalman_filter() is never invoked. Conductor passes dominant_state='UNKNOWN' into RiskEngine.compute_multi_asset_kelly() and EntryEngine.score_entry(). Furthermore, compute_mcs is imported at line 41 but never called in Conductor.",
+    "blast_radius": "Affects 26 downstream symbols. In live execution, regime-specific risk-off capital preservation is completely bypassed, resulting in unhedged equity drawdowns while the backtester (quantitative_backtester.py) executes Kalman and MCS properly.",
+    "remediation": "1. In src/fetch_market_data.py, invoke self.snapshot.kalman_state = self.risk_engine.run_kalman_filter(macro_features) prior to Kelly sizing.\n2. Invoke compute_mcs(self.features_vector) and assign to self.snapshot.mcs.\n3. Pass the resolved dominant_state to compute_multi_asset_kelly and score_entry."
+  },
+  {
+    "id": "AUDIT-002",
+    "category": "AST",
+    "severity": "HIGH",
+    "title": "Monolithic Conductor High-Fanout Orchestrator Bottleneck",
+    "affected_symbols": [
+      "src/fetch_market_data.py:Conductor"
+    ],
+    "evidence": "src/fetch_market_data.py:86-180: Conductor directly instantiates 12 quantitative engines, 3 broker/data adapters, data lake persistence, and event bus in a single 1000+ line monolithic class with direct state mutations across all pipeline phases.",
+    "blast_radius": "Tight coupling across entire system (>15 engines). Any schema or engine signature modification requires touching Conductor internals, creating high testing regression risk.",
+    "remediation": "Decompose Conductor into distinct pipeline stages using a modular middleware or chain-of-responsibility pattern: IngestionStage, FeatureStage, InferenceStage, RiskStage, and ExecutionStage."
+  },
+  {
+    "id": "AUDIT-003",
+    "category": "AST",
+    "severity": "MEDIUM",
+    "title": "Configuration Mechanism Drift Between TradingTerminal and Conductor",
+    "affected_symbols": [
+      "src/api.py:/api/trading_settings",
+      "frontend/src/components/TradingTerminal.jsx:toggleTicker",
+      "src/fetch_market_data.py:Conductor.__init__"
+    ],
+    "evidence": "TradingTerminal.jsx toggles tickers via GET/POST /api/trading_settings which reads/writes config/trading_settings.json (src/api.py:412-430). However, Conductor in fetch_market_data.py:103 reads active tickers from config/tickers.json and disabled tickers from data/state/trading_config.json.",
+    "blast_radius": "User interactions in the trading terminal UI fail silently; live backend execution ignores trading_settings.json completely.",
+    "remediation": "Unify configuration paths: refactor /api/trading_settings to read and write config/tickers.json and data/state/trading_config.json, or update Conductor to consume trading_settings.json."
+  },
+  {
+    "id": "AUDIT-004",
+    "category": "AST",
+    "severity": "LOW",
+    "title": "Dead Functions in Feature Engine",
+    "affected_symbols": [
+      "src/engines/feature_engine.py:sign_snapshot_payload",
+      "src/engines/feature_engine.py:check_mathematical_consistency",
+      "src/engines/feature_engine.py:append_to_immutable_chain",
+      "src/engines/feature_engine.py:compute_weekly_liquidity_boundaries",
+      "src/engines/feature_engine.py:calculate_model_tvd",
+      "src/engines/feature_engine.py:calculate_bayesian_conditional_probability"
+    ],
+    "evidence": "AST queries in CodeGraph confirm zero call sites across the codebase for sign_snapshot_payload (line 73), check_mathematical_consistency (line 77), append_to_immutable_chain (line 90), compute_weekly_liquidity_boundaries (line 456), calculate_model_tvd (line 484), and calculate_bayesian_conditional_probability (line 516).",
+    "blast_radius": "6 unreferenced functions bloat codebase maintenance surface and confuse developers regarding active mathematical models.",
+    "remediation": "Deprecate and remove dead functions from feature_engine.py; clean up unused imports in src/fetch_market_data.py."
+  },
+  {
+    "id": "AUDIT-005",
+    "category": "AST",
+    "severity": "LOW",
+    "title": "Deprecated Legacy Modules and Orphaned Utilities",
+    "affected_symbols": [
+      "src/backtest.py:run_backtest",
+      "src/train_models.py",
+      "src/tune_hyperparameters.py",
+      "src/visualize_paper_trading.py",
+      "src/generate_visual_map.py"
+    ],
+    "evidence": "src/backtest.py has been superseded by src/quantitative_backtester.py; src/train_models.py trains an unused VotingClassifier superseded by src/training/train_models.py; tune_hyperparameters.py references non-existent config/api_keys.json.",
+    "blast_radius": "5 standalone files containing out-of-sync duplicate logic and incompatible configurations.",
+    "remediation": "Move obsolete scripts to a legacy/ archive directory or delete them from source tree, updating documentation to point to active tools."
+  },
+  {
+    "id": "AUDIT-006",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "Unhandled Null/Undefined API Payload Vulnerabilities",
+    "affected_symbols": [
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/TradingTerminal.jsx",
+      "frontend/src/components/PaperTradingTab.jsx",
+      "frontend/src/App.jsx"
+    ],
+    "evidence": "OverviewTab.jsx:14 calls data.regime.replace(/_/g, ' ') and lines 106, 110 call data.decision.entry_score.toFixed(2); TradingTerminal.jsx:35 calls data.active_tickers.map(...); PaperTradingTab.jsx:134 dereferences portfolio.total_equity and lines 222, 246 evaluate portfolio.win_rate !== undefined (which evaluates to true for null), immediately executing (null).toFixed() and throwing TypeError.",
+    "blast_radius": "A single null field or partial JSON response from FastAPI unmounts the entire React root tree, locking the user out of the dashboard.",
+    "remediation": "Implement defensive optional chaining (?.) and default null-coalescing (??) across all numeric formatting, string transformations, and array iterations: (data?.regime ?? 'UNKNOWN').replace(), (portfolio?.win_rate ?? 0).toFixed(1)."
+  },
+  {
+    "id": "AUDIT-007",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "Missing Error Boundary Coverage Across 6 Tabs and Root Shell",
+    "affected_symbols": [
+      "frontend/src/App.jsx:121-131",
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/TradingTerminal.jsx",
+      "frontend/src/components/PaperTradingTab.jsx",
+      "frontend/src/components/DiagnosticsTab.jsx",
+      "frontend/src/components/SettingsTab.jsx",
+      "frontend/src/components/ReportsTab.jsx"
+    ],
+    "evidence": "Only MacroTab, FundamentalTab, MathModelTab, and PipelineVisualizer are wrapped in ErrorBoundary. The App shell and 6 out of 10 tab views render without error boundaries in App.jsx lines 121-131.",
+    "blast_radius": "Any runtime exception in 60% of tabs crashes the entire SPA into a blank white screen with no fallback UI or recovery action.",
+    "remediation": "Wrap the main tab container and each individual tab view in ErrorBoundary with dedicated fallback recovery buttons."
+  },
+  {
+    "id": "AUDIT-008",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "WebSocket Telemetry Lifecycle Breakdown and Heartbeat State Eviction",
+    "affected_symbols": [
+      "frontend/src/components/PipelineVisualizer.jsx:9-35",
+      "src/api.py:/api/ws/pipeline"
+    ],
+    "evidence": "PipelineVisualizer.jsx establishes native WebSocket with no onclose or onerror reconnect handlers. Heartbeats sent by src/api.py:75 ({\"type\": \"heartbeat\"}) pass data.component as undefined, causing setActiveComponent(undefined) (clearing SVG active node highlights) and appending heartbeats to logs array, evicting real pipeline logs from the 20-entry circular buffer.",
+    "blast_radius": "Telemetry permanently dies on first network interruption; active pipeline visualizer nodes flicker off every 3 seconds.",
+    "remediation": "1. Add exponential backoff auto-reconnect onclose/onerror.\n2. Filter out heartbeat messages: if (data.type === 'heartbeat') return;\n3. Safely check readyState before closing in useEffect cleanup."
+  },
+  {
+    "id": "AUDIT-009",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "Missing Development Reverse Proxy in Vite Configuration",
+    "affected_symbols": [
+      "frontend/vite.config.js"
+    ],
+    "evidence": "frontend/vite.config.js contains plugins: [react()] with zero server proxy settings. In local dev (port 5173), fetch('/api/*') and WebSocket connections to ws://localhost:5173/api/ws/pipeline fail with 404 or connection refused.",
+    "blast_radius": "Breaks local frontend development environment; frontend cannot communicate with backend without custom external Nginx proxy.",
+    "remediation": "Add server.proxy configuration in vite.config.js mapping /api and /api/ws to http://localhost:8000 and ws://localhost:8000 with ws: true and changeOrigin: true."
+  },
+  {
+    "id": "AUDIT-010",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "Ghost CSS Classes and Collapsed Regime Progress Bars",
+    "affected_symbols": [
+      "frontend/src/index.css",
+      "frontend/src/components/MathModelTab.jsx:27-28",
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/ReportsTab.jsx:102,112"
+    ],
+    "evidence": "Classes .text-plasma-green, .text-plasma-red, .text-plasma-cyan, .text-plasma-purple, .text-plasma-amber, .text-purple, .btn-primary, .btn-danger, .progress-bg, and .progress-fill do not exist in index.css. In MathModelTab.jsx lines 27-28, regime progress bars render at 0px height (invisible); buttons in ReportsTab render unstyled.",
+    "blast_radius": "Core quantitative visual indicators (HMM regime probabilities) are completely invisible to traders; UI buttons lack affordance.",
+    "remediation": "Define missing CSS classes in index.css: set .progress-bg with height: 6px and background; .progress-fill with height: 100%; implement .btn-primary and .btn-danger styling."
+  },
+  {
+    "id": "AUDIT-011",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "API Secret Key Input Missing from System Configuration UI",
+    "affected_symbols": [
+      "frontend/src/components/SettingsTab.jsx:12,63,85"
+    ],
+    "evidence": "SettingsTab.jsx declares apiSecret state and saves to localStorage.setItem('quantos_api_key', apiSecret) at line 63, but completely omits an <input> element for apiSecret in JSX lines 85-136.",
+    "blast_radius": "When backend QUANTOS_SECRET authentication is activated, users have no visual UI mechanism to configure credentials, permanently blocking manual trigger actions.",
+    "remediation": "Add a password input field for QuantOS API Secret in SettingsTab.jsx bound to apiSecret and setApiSecret."
+  },
+  {
+    "id": "AUDIT-012",
+    "category": "Frontend",
+    "severity": "MEDIUM",
+    "title": "Cascading 1000ms Clock Re-Render Loop in Application Root",
+    "affected_symbols": [
+      "frontend/src/App.jsx:66-69"
+    ],
+    "evidence": "frontend/src/App.jsx lines 66-69 executes setInterval(..., 1000) modifying clock state in the root App component every second. Because child tabs are not memoized with React.memo, the entire active tab reconciles every second.",
+    "blast_radius": "Continuous 1Hz virtual DOM re-evaluation causes CPU churn, battery drain, and unnecessary SVG/chart canvas reconciliations.",
+    "remediation": "Extract the clock display into an isolated leaf component (<ClockDisplay timeZone={timeZone} />) with local state, removing clock state from App.jsx."
+  },
+  {
+    "id": "AUDIT-013",
+    "category": "Frontend",
+    "severity": "MEDIUM",
+    "title": "Global setInterval Variable Shadowing in TradingTerminal",
+    "affected_symbols": [
+      "frontend/src/components/TradingTerminal.jsx:23"
+    ],
+    "evidence": "frontend/src/components/TradingTerminal.jsx:23 declares const [interval, setInterval] = useState('D'), which shadows window.setInterval inside the component scope.",
+    "blast_radius": "Any timer call inside TradingTerminal invokes the React state setter rather than window.setInterval, creating silent timer failures.",
+    "remediation": "Rename state hook to const [chartInterval, setChartInterval] = useState('D')."
+  },
+  {
+    "id": "AUDIT-014",
+    "category": "Persistence",
+    "severity": "CRITICAL",
+    "title": "Destructive Non-Atomic State Overwrite Hazards",
+    "affected_symbols": [
+      "src/adapters/paper_broker.py:PaperBroker._save_portfolio",
+      "src/fundamental_agent/main.py:49",
+      "src/api.py:578",
+      "src/api.py:427"
+    ],
+    "evidence": "paper_broker.py:56 writes paper_portfolio.json directly via open(self.portfolio_path, 'w') + json.dump; fundamental_agent/main.py:49 writes fundamental_scores.json via open(..., 'w'); api.py writes trading_config.json via open(..., 'w'). None of these use atomic tempfile+replace.",
+    "blast_radius": "If process crashes or API reads file while being written, file is truncated to 0 bytes, permanently erasing paper trading cash, positions, and user trading configurations.",
+    "remediation": "Implement centralized atomic_write_json utility utilizing tempfile.mkstemp, flush, os.fsync, and os.replace across all state writers."
+  },
+  {
+    "id": "AUDIT-015",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "Data Lake Parquet Schema Drift Across 70 Daily Files",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_tabular",
+      "data/raw/YYYY/MM/DD/raw_daily_ohlcv.parquet"
+    ],
+    "evidence": "Inspection of all 70 daily Parquet files in data/raw/ identifies 13 distinct schema signatures with column counts fluctuating from 161 to 212. Caused by unconstrained ticker additions and unordered column flattening of yfinance MultiIndex in lake_manager.py:35-36.",
+    "blast_radius": "Vectorized analytics engines (PyArrow Dataset, DuckDB, Polars) fail with SchemaError when scanning across multiple partitions.",
+    "remediation": "Enforce canonical sorted column ordering in LakeManager.save_tabular; implement schema backfilling and validation against a strict Pydantic/PyArrow schema."
+  },
+  {
+    "id": "AUDIT-016",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "Partition Directory Contamination Breaking Multi-File Dataset Scans",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_unstructured",
+      "data/raw/YYYY/MM/DD/"
+    ],
+    "evidence": "lake_manager.py writes both tabular Parquet files (raw_daily_ohlcv.parquet) and JSONL files (events.jsonl, market_snapshot.jsonl) into the exact same partition directory. pyarrow.dataset.dataset('data/raw', format='parquet') immediately crashes on events.jsonl.",
+    "blast_radius": "Completely disables partition-wide SQL queries and parquet dataset ingestion pipelines.",
+    "remediation": "Segregate tabular and unstructured datasets into distinct storage roots: data/raw/ohlcv/YYYY/MM/DD/ and data/raw/events/YYYY/MM/DD/."
+  },
+  {
+    "id": "AUDIT-017",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "JSONL Records Exceeding 4096B POSIX Atomic Append Boundary",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:89",
+      "data/raw/YYYY/MM/DD/market_snapshot.jsonl"
+    ],
+    "evidence": "lake_manager.py:89 appends serialized snapshots measuring up to 24,066 bytes using open(..., 'a'). POSIX guarantees write atomicity only up to PIPE_BUF (4,096 bytes). Concurrent appends split large records, corrupting JSONL syntax.",
+    "blast_radius": "Corrupts market_snapshot.jsonl log streams under concurrent execution cycles, breaking downstream JSON parsers.",
+    "remediation": "Protect JSONL appends with fcntl.flock on a dedicated log lock file, or buffer writes through a synchronized queue."
+  },
+  {
+    "id": "AUDIT-018",
+    "category": "Persistence",
+    "severity": "MEDIUM",
+    "title": "Write-Only 'Black Hole' Data Lake Anti-Pattern",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py",
+      "src/fetch_market_data.py",
+      "src/quantitative_backtester.py:75"
+    ],
+    "evidence": "LakeManager writes Parquet partitions on every execution cycle, but no module in QuantOS ever reads from the Parquet data lake. fetch_market_data.py and quantitative_backtester.py repeatedly download historical bars from external APIs over the network.",
+    "blast_radius": "Consumes disk I/O and storage without operational utility; leaves entire system vulnerable to external API rate limits and network outages.",
+    "remediation": "Refactor YahooAdapter and Backtester to implement a read-through local cache that queries local Parquet partitions before issuing network requests."
+  },
+  {
+    "id": "AUDIT-019",
+    "category": "Persistence",
+    "severity": "MEDIUM",
+    "title": "Partial Atomic Write Utility Lacking fsync Flush",
+    "affected_symbols": [
+      "src/fetch_market_data.py:atomic_json_write"
+    ],
+    "evidence": "atomic_json_write in fetch_market_data.py:48-61 writes tempfile and executes os.replace without calling f.flush() and os.fsync(fd). In POSIX filesystems, directory entry rename can commit before dirty page cache blocks are flushed.",
+    "blast_radius": "Sudden process termination, power loss, or OS crash can leave a 0-byte or corrupted file at destination path.",
+    "remediation": "Add f.flush() and os.fsync(f.fileno()) immediately prior to os.replace."
+  },
+  {
+    "id": "AUDIT-020",
+    "category": "Automation",
+    "severity": "CRITICAL",
+    "title": "Concurrency Collision Between Market Monitor and Scheduled Cron",
+    "affected_symbols": [
+      "src/market_monitor.py:112",
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "scheduler.py protects scheduled jobs with execution.lock via fcntl.flock. However, market_monitor.py:112 executes subprocess.run(['python3', 'src/fetch_market_data.py', '--interval', '1h']) upon volatility or stop loss triggers WITHOUT acquiring execution.lock.",
+    "blast_radius": "Dual concurrent execution of fetch_market_data.py collides on paper_portfolio.json, paper_ledger.csv, and Parquet files, causing duplicate orders, double-spent cash, and data corruption.",
+    "remediation": "Refactor market_monitor.py to invoke fetch_market_data.py via run_locked_subprocess with non-blocking check and exponential backoff retry."
+  },
+  {
+    "id": "AUDIT-021",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Unbounded Blocking Wait and Mutex Truncation on Open",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "run_locked_subprocess opens lock_file with open(lock_path, 'w') which truncates the lockfile inode while held by another process. Furthermore, fcntl.flock(lock_file, fcntl.LOCK_EX) blocks indefinitely with no timeout.",
+    "blast_radius": "A hung network request in a child process blocks the APScheduler worker thread permanently, exhausting the 10-worker pool and freezing the entire automation engine.",
+    "remediation": "Open lock file in append mode ('a'); add subprocess.run(timeout=600); implement non-blocking lock acquisition with retry timeout."
+  },
+  {
+    "id": "AUDIT-022",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Scheduler Child Process Failure Suppression and Blind Cascade",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess",
+      "src/scheduler.py:run_4h",
+      "src/scheduler.py:run_1d"
+    ],
+    "evidence": "run_locked_subprocess executes subprocess.run(args) with default check=False and ignores returncode. In run_4h, if fetch_market_data.py exits with error code 1, the scheduler immediately executes build_report.py and _apply_adaptive_frequency() against missing or stale state.",
+    "blast_radius": "Errors are silently masked; misleading reports are generated; cadence adaptation acts on stale data.",
+    "remediation": "Check completed_process.returncode == 0; raise RuntimeError or log alert and abort downstream report generation and frequency adaptation on failure."
+  },
+  {
+    "id": "AUDIT-023",
+    "category": "Automation",
+    "severity": "MEDIUM",
+    "title": "Broken Mutex Boundary on Report Generation",
+    "affected_symbols": [
+      "src/scheduler.py:run_4h",
+      "src/scheduler.py:run_1d"
+    ],
+    "evidence": "In run_4h and run_1d, execution.lock is released immediately after fetch_market_data.py completes. build_report.py is executed outside the lock, allowing a newly triggered 1H job to rewrite snapshot files while build_report is reading them.",
+    "blast_radius": "Race condition corrupts generated markdown execution reports and visual maps.",
+    "remediation": "Extend execution.lock context to encapsulate both fetch_market_data.py and build_report.py."
+  },
+  {
+    "id": "AUDIT-024",
+    "category": "Automation",
+    "severity": "MEDIUM",
+    "title": "Adaptive Frequency Rapid Execution Cascade",
+    "affected_symbols": [
+      "src/scheduler.py:_apply_adaptive_frequency"
+    ],
+    "evidence": "In scheduler.py:71-100, when frequency changes, the job is re-added with next_run_time=datetime.now(), forcing immediate execution. If market metrics oscillate, this triggers rapid back-to-back pipeline executions.",
+    "blast_radius": "Spams external market APIs (Yahoo Finance, Fred), exhausts rate limits, and spikes CPU usage.",
+    "remediation": "Calculate next regular cron interval for newly selected cadence instead of forcing immediate execution."
+  },
+  {
+    "id": "AUDIT-025",
+    "category": "Automation",
+    "severity": "LOW",
+    "title": "Frequency Controller Hard-Cap at 4H Disconnecting 1H Mode",
+    "affected_symbols": [
+      "src/engines/frequency_controller.py:evaluate",
+      "src/scheduler.py:_apply_adaptive_frequency"
+    ],
+    "evidence": "src/engines/frequency_controller.py:90-98 hard-caps recommended execution frequency at '4h' even for maximum volatility scores. Consequently, the '1h' branch in scheduler.py:87-90 is unreachable dead code in production.",
+    "blast_radius": "Intra-cycle 1H execution mode is disabled despite scheduler support, preventing agile risk reallocation during extreme volatility events.",
+    "remediation": "Update frequency_controller.py: if score >= 4 and enable_1h_mode: return '1h'."
+  }
+];
+
+    // State
+    let currentSeverity = 'ALL';
+    let currentCategory = 'ALL';
+    let currentSearch = '';
+    let currentSort = 'severity';
+    let currentView = 'grid'; // 'grid' | 'table'
+    let remediatedSet = new Set(JSON.parse(localStorage.getItem('quantos_audit_remediated') || '[]'));
+
+    // DOM Elements
+    const gridContainer = document.getElementById('findingsGrid');
+    const tableContainer = document.getElementById('findingsTable');
+    const tableBody = document.getElementById('findingsTableBody');
+    const emptyState = document.getElementById('emptyState');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const sortSelect = document.getElementById('sortSelect');
+    const viewGridBtn = document.getElementById('viewGridBtn');
+    const viewTableBtn = document.getElementById('viewTableBtn');
+    const detailModal = document.getElementById('detailModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalDoneBtn = document.getElementById('modalDoneBtn');
+    const copyEvidenceBtn = document.getElementById('copyEvidenceBtn');
+    const modalCheckbox = document.getElementById('modalCheckbox');
+    const remediationDrawer = document.getElementById('remediationDrawer');
+    const toggleRemediationDrawerBtn = document.getElementById('toggleRemediationDrawerBtn');
+    const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+    const drawerChecklist = document.getElementById('drawerChecklist');
+
+    // Severity mapping order
+    const severityWeight = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+
+    function getSeverityBadge(sev) {
+      if (sev === 'CRITICAL') return '<span class="badge-critical text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold">CRITICAL</span>';
+      if (sev === 'HIGH') return '<span class="badge-high text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold">HIGH</span>';
+      if (sev === 'MEDIUM') return '<span class="badge-medium text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold">MEDIUM</span>';
+      return '<span class="badge-low text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold">LOW</span>';
+    }
+
+    function getCategoryBadge(cat) {
+      const map = {
+        'AST': 'bg-purple-950/70 text-purple-300 border-purple-800/80',
+        'Frontend': 'bg-cyan-950/70 text-cyan-300 border-cyan-800/80',
+        'Persistence': 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80',
+        'Automation': 'bg-amber-950/70 text-amber-300 border-amber-800/80'
+      };
+      const cls = map[cat] || 'bg-slate-900 text-slate-300 border-slate-700';
+      return `<span class="text-[11px] px-2 py-0.5 rounded-md font-mono border ${cls}">${cat}</span>`;
+    }
+
+    // Filter & Sort Findings
+    function getFilteredFindings() {
+      return AUDIT_DATA.filter(item => {
+        // Severity Filter
+        if (currentSeverity !== 'ALL' && item.severity !== currentSeverity) return false;
+        // Category Filter
+        if (currentCategory !== 'ALL' && item.category !== currentCategory) return false;
+        // Search Filter
+        if (currentSearch) {
+          const q = currentSearch.toLowerCase();
+          const matchId = item.id.toLowerCase().includes(q);
+          const matchTitle = item.title.toLowerCase().includes(q);
+          const matchEvidence = item.evidence.toLowerCase().includes(q);
+          const matchBlast = item.blast_radius.toLowerCase().includes(q);
+          const matchSymbols = item.affected_symbols.some(s => s.toLowerCase().includes(q));
+          if (!matchId && !matchTitle && !matchEvidence && !matchBlast && !matchSymbols) return false;
+        }
+        return true;
+      }).sort((a, b) => {
+        if (currentSort === 'severity') {
+          return severityWeight[b.severity] - severityWeight[a.severity] || a.id.localeCompare(b.id);
+        } else if (currentSort === 'id') {
+          return a.id.localeCompare(b.id);
+        } else if (currentSort === 'category') {
+          return a.category.localeCompare(b.category) || a.id.localeCompare(b.id);
+        }
+        return 0;
+      });
+    }
+
+    // Render Cards
+    function render() {
+      const filtered = getFilteredFindings();
+      updateMetrics();
+
+      if (filtered.length === 0) {
+        gridContainer.innerHTML = '';
+        tableBody.innerHTML = '';
+        gridContainer.classList.add('hidden');
+        tableContainer.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      if (currentView === 'grid') {
+        tableContainer.classList.add('hidden');
+        gridContainer.classList.remove('hidden');
+        renderGrid(filtered);
+      } else {
+        gridContainer.classList.add('hidden');
+        tableContainer.classList.remove('hidden');
+        renderTable(filtered);
+      }
+
+      renderDrawerChecklist();
+    }
+
+    function renderGrid(items) {
+      gridContainer.innerHTML = items.map(item => {
+        const isDone = remediatedSet.has(item.id);
+        const borderCls = isDone ? 'border-emerald-500/40 opacity-75' : '';
+        const symbolChips = item.affected_symbols.slice(0, 2).map(s => 
+          `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-[10px] text-slate-400 font-mono truncate max-w-[200px]" title="${s}">${s}</span>`
+        ).join('');
+        const moreChips = item.affected_symbols.length > 2 
+          ? `<span class="text-[10px] text-slate-500 font-mono">+${item.affected_symbols.length - 2} more</span>` 
+          : '';
+
+        return `
+          <div class="glass-card rounded-2xl p-5 flex flex-col justify-between cursor-pointer ${borderCls}" onclick="openDetailModal('${item.id}')">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-xs font-bold ${isDone ? 'text-emerald-400 line-through' : 'text-cyan-400'}">${item.id}</span>
+                  ${getSeverityBadge(item.severity)}
+                  ${getCategoryBadge(item.category)}
+                </div>
+                <input 
+                  type="checkbox" 
+                  ${isDone ? 'checked' : ''} 
+                  onclick="event.stopPropagation(); toggleRemediation('${item.id}')"
+                  title="Toggle Remediated"
+                  class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer"
+                >
+              </div>
+
+              <h3 class="text-sm font-bold text-white tracking-tight mb-2 leading-snug hover:text-cyan-300 transition">
+                ${item.title}
+              </h3>
+
+              <p class="text-xs text-slate-400 line-clamp-2 mb-3 font-sans leading-relaxed">
+                ${item.blast_radius}
+              </p>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800/80 mt-2 flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${symbolChips}
+                ${moreChips}
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-1">
+                <span class="${isDone ? 'text-emerald-400 font-semibold' : 'text-slate-500'}">
+                  ${isDone ? '✓ Remediated' : '• Pending Fix'}
+                </span>
+                <span class="text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                  Drill Down →
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTable(items) {
+      tableBody.innerHTML = items.map(item => {
+        const isDone = remediatedSet.has(item.id);
+        const primarySymbol = item.affected_symbols[0] || 'N/A';
+        return `
+          <tr class="hover:bg-slate-900/40 cursor-pointer transition ${isDone ? 'opacity-60 bg-emerald-950/10' : ''}" onclick="openDetailModal('${item.id}')">
+            <td class="p-4 text-center" onclick="event.stopPropagation()">
+              <input 
+                type="checkbox" 
+                ${isDone ? 'checked' : ''} 
+                onclick="toggleRemediation('${item.id}')"
+                class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 cursor-pointer"
+              >
+            </td>
+            <td class="p-4 font-bold ${isDone ? 'text-emerald-400 line-through' : 'text-cyan-400'}">${item.id}</td>
+            <td class="p-4">${getSeverityBadge(item.severity)}</td>
+            <td class="p-4">${getCategoryBadge(item.category)}</td>
+            <td class="p-4 max-w-md">
+              <div class="text-white font-medium text-xs truncate">${item.title}</div>
+              <div class="text-slate-400 text-[11px] truncate font-sans">${item.blast_radius}</div>
+            </td>
+            <td class="p-4 text-slate-300 truncate max-w-xs" title="${primarySymbol}">${primarySymbol}</td>
+            <td class="p-4 text-right">
+              <button class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-[11px]">Inspect</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderDrawerChecklist() {
+      drawerChecklist.innerHTML = AUDIT_DATA.map(item => {
+        const isDone = remediatedSet.has(item.id);
+        return `
+          <div class="p-3 rounded-xl border ${isDone ? 'bg-emerald-950/20 border-emerald-800/40' : 'bg-slate-900/50 border-slate-800'} flex items-start gap-3 transition">
+            <input 
+              type="checkbox" 
+              ${isDone ? 'checked' : ''} 
+              onchange="toggleRemediation('${item.id}')"
+              class="w-4 h-4 mt-0.5 rounded bg-slate-900 border-slate-700 text-cyan-500 cursor-pointer"
+            >
+            <div class="flex-1 min-w-0" onclick="openDetailModal('${item.id}')">
+              <div class="flex items-center justify-between gap-1 mb-1">
+                <span class="font-bold ${isDone ? 'text-emerald-400 line-through' : 'text-cyan-400'}">${item.id}</span>
+                ${getSeverityBadge(item.severity)}
+              </div>
+              <p class="text-slate-300 font-sans text-xs truncate cursor-pointer hover:text-white">${item.title}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateMetrics() {
+      const total = AUDIT_DATA.length;
+      const crit = AUDIT_DATA.filter(d => d.severity === 'CRITICAL').length;
+      const high = AUDIT_DATA.filter(d => d.severity === 'HIGH').length;
+      const med = AUDIT_DATA.filter(d => d.severity === 'MEDIUM').length;
+      const low = AUDIT_DATA.filter(d => d.severity === 'LOW').length;
+      const resolved = remediatedSet.size;
+      const pct = Math.round((resolved / total) * 100);
+
+      document.getElementById('kpiTotal').textContent = total;
+      document.getElementById('kpiCritical').textContent = crit;
+      document.getElementById('kpiHigh').textContent = high;
+      document.getElementById('kpiMedLow').textContent = med + low;
+      document.getElementById('kpiResolved').textContent = resolved;
+      document.getElementById('remediationProgressBar').style.width = `${pct}%`;
+      document.getElementById('remediatedCountBadge').textContent = resolved;
+      document.getElementById('drawerProgressText').textContent = `${resolved} / ${total} Completed (${pct}%)`;
+      document.getElementById('drawerProgressBar').style.width = `${pct}%`;
+    }
+
+    // Modal Operations
+    let activeModalFindingId = null;
+
+    function openDetailModal(id) {
+      const item = AUDIT_DATA.find(d => d.id === id);
+      if (!item) return;
+
+      activeModalFindingId = id;
+      document.getElementById('modalId').textContent = item.id;
+      document.getElementById('modalTitle').textContent = item.title;
+      document.getElementById('modalSeverity').outerHTML = `<span id="modalSeverity">${getSeverityBadge(item.severity)}</span>`;
+      document.getElementById('modalCategory').outerHTML = `<span id="modalCategory">${getCategoryBadge(item.category)}</span>`;
+
+      // Symbols chips
+      document.getElementById('modalSymbols').innerHTML = item.affected_symbols.map(s => 
+        `<span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-cyan-300 select-all">${s}</span>`
+      ).join('');
+
+      document.getElementById('modalEvidence').textContent = item.evidence;
+      document.getElementById('modalBlastRadius').textContent = item.blast_radius;
+      document.getElementById('modalRemediation').textContent = item.remediation;
+
+      const isDone = remediatedSet.has(item.id);
+      modalCheckbox.checked = isDone;
+
+      detailModal.showModal();
+    }
+
+    function closeDetailModal() {
+      detailModal.close();
+      activeModalFindingId = null;
+    }
+
+    function toggleRemediation(id) {
+      if (remediatedSet.has(id)) {
+        remediatedSet.delete(id);
+      } else {
+        remediatedSet.add(id);
+      }
+      localStorage.setItem('quantos_audit_remediated', JSON.stringify([...remediatedSet]));
+      render();
+    }
+
+    // Event Listeners
+    closeModalBtn.addEventListener('click', closeDetailModal);
+    modalDoneBtn.addEventListener('click', closeDetailModal);
+    detailModal.addEventListener('click', (e) => {
+      const rect = detailModal.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        closeDetailModal();
+      }
+    });
+
+    modalCheckbox.addEventListener('change', () => {
+      if (activeModalFindingId) {
+        toggleRemediation(activeModalFindingId);
+      }
+    });
+
+    copyEvidenceBtn.addEventListener('click', () => {
+      const evidenceText = document.getElementById('modalEvidence').textContent;
+      navigator.clipboard.writeText(evidenceText).then(() => {
+        const orig = copyEvidenceBtn.innerHTML;
+        copyEvidenceBtn.innerHTML = '<span>✓ Copied!</span>';
+        setTimeout(() => copyEvidenceBtn.innerHTML = orig, 2000);
+      });
+    });
+
+    // Drawer Toggles
+    toggleRemediationDrawerBtn.addEventListener('click', () => {
+      remediationDrawer.classList.toggle('translate-x-full');
+    });
+    closeDrawerBtn.addEventListener('click', () => {
+      remediationDrawer.classList.add('translate-x-full');
+    });
+
+    document.getElementById('markAllCompletedBtn').addEventListener('click', () => {
+      AUDIT_DATA.forEach(d => remediatedSet.add(d.id));
+      localStorage.setItem('quantos_audit_remediated', JSON.stringify([...remediatedSet]));
+      render();
+    });
+
+    document.getElementById('resetChecklistBtn').addEventListener('click', () => {
+      remediatedSet.clear();
+      localStorage.removeItem('quantos_audit_remediated');
+      render();
+    });
+
+    // Severity Filters
+    document.querySelectorAll('.filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(b => {
+          b.classList.remove('active', 'border-cyan-500/50', 'bg-cyan-500/20', 'text-cyan-300', 'font-semibold');
+          b.classList.add('bg-slate-900/60');
+        });
+        btn.classList.add('active', 'border-cyan-500/50', 'bg-cyan-500/20', 'text-cyan-300', 'font-semibold');
+        currentSeverity = btn.dataset.filterValue;
+        render();
+      });
+    });
+
+    // Category Filters
+    document.querySelectorAll('.category-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.category-pill').forEach(b => {
+          b.classList.remove('active', 'border-cyan-500/50', 'bg-cyan-500/20', 'text-cyan-300', 'font-semibold');
+          b.classList.add('bg-slate-900/60');
+        });
+        btn.classList.add('active', 'border-cyan-500/50', 'bg-cyan-500/20', 'text-cyan-300', 'font-semibold');
+        currentCategory = btn.dataset.filterValue;
+        render();
+      });
+    });
+
+    // Search Input
+    searchInput.addEventListener('input', (e) => {
+      currentSearch = e.target.value.trim();
+      if (currentSearch) {
+        clearSearchBtn.classList.remove('hidden');
+      } else {
+        clearSearchBtn.classList.add('hidden');
+      }
+      render();
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      currentSearch = '';
+      clearSearchBtn.classList.add('hidden');
+      render();
+    });
+
+    document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+      currentSeverity = 'ALL';
+      currentCategory = 'ALL';
+      currentSearch = '';
+      searchInput.value = '';
+      clearSearchBtn.classList.add('hidden');
+      document.querySelector('.filter-pill[data-filter-value="ALL"]').click();
+      document.querySelector('.category-pill[data-filter-value="ALL"]').click();
+    });
+
+    // Sort Select
+    sortSelect.addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      render();
+    });
+
+    // View Switcher
+    viewGridBtn.addEventListener('click', () => {
+      currentView = 'grid';
+      viewGridBtn.className = "px-3 py-1 rounded bg-cyan-500/20 text-cyan-400 font-semibold border border-cyan-500/30";
+      viewTableBtn.className = "px-3 py-1 rounded text-slate-400 hover:text-white";
+      render();
+    });
+
+    viewTableBtn.addEventListener('click', () => {
+      currentView = 'table';
+      viewTableBtn.className = "px-3 py-1 rounded bg-cyan-500/20 text-cyan-400 font-semibold border border-cyan-500/30";
+      viewGridBtn.className = "px-3 py-1 rounded text-slate-400 hover:text-white";
+      render();
+    });
+
+    // Export Handlers
+    document.getElementById('exportJsonBtn').addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(AUDIT_DATA, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `quantos_audit_evidence_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    });
+
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      const headers = ["ID", "Category", "Severity", "Title", "Affected Symbols", "Blast Radius", "Status"];
+      const rows = AUDIT_DATA.map(d => [
+        d.id,
+        d.category,
+        d.severity,
+        `"${d.title.replace(/"/g, '""')}"`,
+        `"${d.affected_symbols.join('; ').replace(/"/g, '""')}"`,
+        `"${d.blast_radius.replace(/"/g, '""')}"`,
+        remediatedSet.has(d.id) ? "Remediated" : "Pending"
+      ]);
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", encodeURI(csvContent));
+      downloadAnchor.setAttribute("download", `quantos_audit_matrix_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!remediationDrawer.classList.contains('translate-x-full')) {
+          remediationDrawer.classList.add('translate-x-full');
+        } else if (detailModal.open) {
+          closeDetailModal();
+        }
+      }
+    });
+
+    // Initialize
+    render();
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 
-export default function SettingsTab() {
+function SettingsTabContent() {
   const [settings, setSettings] = useState(null);
   const [inputs, setInputs] = useState({
     gemini_key: '',
@@ -38,34 +39,38 @@ export default function SettingsTab() {
     if (inputs.discord_webhook) payload.discord_webhook = inputs.discord_webhook;
     
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Api-Key': localStorage.getItem('quantos_api_key') || ''
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (res.ok) {
-        setSaveSuccess(true);
-        setInputs({ gemini_key: '', fred_key: '', discord_webhook: '' }); // Clear inputs after save
-        await fetchSettings(); // Refresh masked keys
+      if (Object.keys(payload).length > 0) {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Api-Key': apiSecret || localStorage.getItem('quantos_api_key') || ''
+          },
+          body: JSON.stringify(payload)
+        });
         
-        setTimeout(() => setSaveSuccess(false), 3000); // Hide success message after 3s
+        if (res.ok) {
+          setInputs({ gemini_key: '', fred_key: '', discord_webhook: '' }); // Clear inputs after save
+          await fetchSettings(); // Refresh masked keys
+        }
       }
+      
+      // Save API secret to localStorage
+      localStorage.setItem('quantos_api_key', apiSecret);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000); // Hide success message after 3s
     } catch (e) {
       console.error("Failed to save settings", e);
     } finally {
       setIsSaving(false);
     }
-    // Save API secret to localStorage
-    localStorage.setItem('quantos_api_key', apiSecret);
   };
 
   if (!settings) {
     return <div className="glass-panel" style={{ textAlign: 'center', padding: '40px' }}>Loading settings...</div>;
   }
+
+  const hasChanges = Boolean(inputs.gemini_key || inputs.fred_key || inputs.discord_webhook || (apiSecret !== (localStorage.getItem('quantos_api_key') || '')));
 
   return (
     <div className="grid-layout">
@@ -89,12 +94,12 @@ export default function SettingsTab() {
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
               <input 
                 type="password"
-                placeholder={settings.has_gemini ? `Current: ${settings.gemini_key_masked}` : "Enter API Key..."}
+                placeholder={settings?.has_gemini ? `Current: ${settings?.gemini_key_masked}` : "Enter API Key..."}
                 value={inputs.gemini_key}
                 onChange={(e) => setInputs({...inputs, gemini_key: e.target.value})}
                 style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'monospace' }}
               />
-              {settings.has_gemini && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
+              {settings?.has_gemini && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
             </div>
           </div>
 
@@ -107,12 +112,12 @@ export default function SettingsTab() {
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
               <input 
                 type="password"
-                placeholder={settings.has_fred ? `Current: ${settings.fred_key_masked}` : "Enter API Key..."}
+                placeholder={settings?.has_fred ? `Current: ${settings?.fred_key_masked}` : "Enter API Key..."}
                 value={inputs.fred_key}
                 onChange={(e) => setInputs({...inputs, fred_key: e.target.value})}
                 style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'monospace' }}
               />
-              {settings.has_fred && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
+              {settings?.has_fred && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
             </div>
           </div>
 
@@ -125,12 +130,29 @@ export default function SettingsTab() {
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
               <input 
                 type="password"
-                placeholder={settings.has_webhook ? `Current: ${settings.discord_webhook_masked}` : "Enter Webhook URL..."}
+                placeholder={settings?.has_webhook ? `Current: ${settings?.discord_webhook_masked}` : "Enter Webhook URL..."}
                 value={inputs.discord_webhook}
                 onChange={(e) => setInputs({...inputs, discord_webhook: e.target.value})}
                 style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'monospace' }}
               />
-              {settings.has_webhook && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
+              {settings?.has_webhook && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}> Active</span>}
+            </div>
+          </div>
+
+          {/* QuantOS API Secret Key */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+            <label style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+               QuantOS API Secret Key
+            </label>
+            <p className="text-muted" style={{ fontSize: '0.8rem' }}>Used to authenticate POST requests to QuantOS endpoints (stored locally in browser).</p>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <input 
+                type="password"
+                placeholder="Enter API Secret Key..."
+                value={apiSecret}
+                onChange={(e) => setApiSecret(e.target.value)}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontFamily: 'monospace' }}
+              />
             </div>
           </div>
 
@@ -140,21 +162,20 @@ export default function SettingsTab() {
         <div style={{ marginTop: '40px', display: 'flex', alignItems: 'center', gap: '24px' }}>
           <button 
             onClick={handleSave}
-            disabled={isSaving || (!inputs.gemini_key && !inputs.fred_key && !inputs.discord_webhook)}
+            disabled={isSaving || !hasChanges}
             style={{ 
               padding: '12px 24px', 
               borderRadius: '8px', 
               border: 'none', 
-              cursor: (!inputs.gemini_key && !inputs.fred_key && !inputs.discord_webhook) ? 'not-allowed' : 'pointer', 
+              cursor: (!hasChanges) ? 'not-allowed' : 'pointer', 
               fontWeight: 'bold', 
-              background: (!inputs.gemini_key && !inputs.fred_key && !inputs.discord_webhook) ? 'rgba(255,255,255,0.1)' : 'var(--accent-blue)',
-              color: (!inputs.gemini_key && !inputs.fred_key && !inputs.discord_webhook) ? 'var(--text-muted)' : 'white',
+              background: (!hasChanges) ? 'rgba(255,255,255,0.1)' : 'var(--accent-blue)',
+              color: (!hasChanges) ? 'var(--text-muted)' : 'white',
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}
           >
-
             Save Settings
           </button>
           
@@ -167,5 +188,13 @@ export default function SettingsTab() {
 
       </div>
     </div>
+  );
+}
+
+export default function SettingsTab(props) {
+  return (
+    <ErrorBoundary>
+      <SettingsTabContent {...props} />
+    </ErrorBoundary>
   );
 }

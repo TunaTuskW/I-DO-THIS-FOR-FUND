@@ -1,0 +1,209 @@
+[
+  {
+    "id": "AUDIT-001",
+    "category": "AST",
+    "severity": "CRITICAL",
+    "title": "Kalman Filter & Market Coherence Score Omitted in Live Pipeline",
+    "affected_symbols": [
+      "src/fetch_market_data.py:Conductor",
+      "src/fetch_market_data.py:handle_features_engineered",
+      "src/engines/risk_engine.py:RiskEngine.run_kalman_filter",
+      "src/engines/risk_engine.py:RiskEngine.compute_multi_asset_kelly",
+      "src/engines/feature_engine.py:compute_mcs"
+    ],
+    "evidence": "src/fetch_market_data.py:41 imports compute_mcs but never invokes it (snapshot.mcs remains {}). risk_engine.run_kalman_filter() is never called in fetch_market_data.py. snapshot.kalman_state.dominant_state defaults permanently to 'UNKNOWN', bypassing RiskEngine:227 single-name equity zeroing and safe haven reallocation during market drawdowns.",
+    "blast_radius": "26 downstream symbols in RiskEngine. Single-name high-beta equity positions (NVDA, TSLA, DELL, SPCE) are not zeroed out during drawdowns, and SPX Kelly allocations boost long exposure even during market collapse.",
+    "remediation": "1. Call compute_mcs() in fetch_market_data.py on daily asset returns. 2. Pass resulting MCS, sub-components, and HMM regime probabilities to risk_engine.run_kalman_filter(). 3. Update snapshot.kalman_state with calibrated state before calling compute_multi_asset_kelly and score_entry."
+  },
+  {
+    "id": "AUDIT-002",
+    "category": "Persistence",
+    "severity": "CRITICAL",
+    "title": "Direct Mode 'w' Truncation Hazard on paper_portfolio.json",
+    "affected_symbols": [
+      "src/adapters/paper_broker.py:PaperBroker._save_portfolio",
+      "src/adapters/paper_broker.py:PaperBroker.portfolio_path"
+    ],
+    "evidence": "src/adapters/paper_broker.py:56: with open(self.portfolio_path, 'w') as f: json.dump(self.portfolio, f, indent=4). If the process is terminated, power is lost, or a concurrent thread reads during dump, the portfolio file is truncated to 0 bytes, permanently erasing all cash and position records.",
+    "blast_radius": "12 downstream symbols including API /api/portfolio endpoint, position monitoring in market_monitor.py, and trade rebalancing calculations.",
+    "remediation": "Replace direct open('w') with atomic write pattern using tempfile.mkstemp, f.flush(), os.fsync(), and atomic os.replace."
+  },
+  {
+    "id": "AUDIT-003",
+    "category": "Automation",
+    "severity": "CRITICAL",
+    "title": "Market Monitor Spawns Concurrent Pipeline Without Mutex Lock",
+    "affected_symbols": [
+      "src/market_monitor.py:run_monitor",
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "src/market_monitor.py:112 executes subprocess.run(['python3', 'src/fetch_market_data.py', '--interval', interval]) directly without acquiring execution.lock. Concurrent execution with scheduled crons causes cash double-spending and corrupts Parquet and JSONL files.",
+    "blast_radius": "All persistence layers: paper_portfolio.json, paper_ledger.csv, raw_daily_ohlcv.parquet, and events.jsonl.",
+    "remediation": "Import run_locked_subprocess into market_monitor.py and route all pipeline triggers through the advisory execution.lock."
+  },
+  {
+    "id": "AUDIT-004",
+    "category": "Persistence",
+    "severity": "CRITICAL",
+    "title": "Direct Mode 'w' Overwrite on fundamental_scores.json",
+    "affected_symbols": [
+      "src/fundamental_agent/main.py:run_fundamental_analysis",
+      "src/engines/risk_engine.py:RiskEngine.compute_multi_asset_kelly"
+    ],
+    "evidence": "src/fundamental_agent/main.py:49: with open(out_path, 'w') as f: json.dump(results, f, indent=4). Direct file truncation causes RiskEngine to read an empty file or encounter JSONDecodeError, bypassing fundamental analyst adjustments.",
+    "blast_radius": "Affects fundamental overlays on multi-asset Kelly sizing across all 8 traded symbols.",
+    "remediation": "Refactor fundamental agent writer to use atomic tempfile write with os.replace and os.fsync."
+  },
+  {
+    "id": "AUDIT-005",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "13 Distinct Parquet Schema Signatures with Expanding and Randomized Column Layouts",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_tabular",
+      "data/raw/"
+    ],
+    "evidence": "PyArrow schema audit verifies 13 distinct column schemas across 70 daily files, ranging from 161 to 212 columns. In LakeManager:36, MultiIndex flattening without column sorting randomizes column order on every write depending on yfinance download thread timing.",
+    "blast_radius": "Prevents automated schema unification across historical partitions; causes column offset errors in downstream analytic models.",
+    "remediation": "Enforce strict schema ordering via sorted(df.columns) or explicit canonical schema dictionary before serializing Parquet files."
+  },
+  {
+    "id": "AUDIT-006",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "Co-location of .parquet and .jsonl in Daily Partitions Breaks Dataset Scanners",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager._get_daily_partition_dir",
+      "src/data_lake/lake_manager.py:LakeManager.save_tabular",
+      "src/data_lake/lake_manager.py:LakeManager.save_unstructured"
+    ],
+    "evidence": "pyarrow.dataset.dataset('data/raw', format='parquet') raises ArrowInvalid: Could not open Parquet input source 'data/raw/2026/05/26/events.jsonl': Parquet magic bytes not found in footer. because tabular parquet and jsonl event logs are saved in the same date directory.",
+    "blast_radius": "Prevents PyArrow, DuckDB, Polars, and Trino from scanning or querying the raw data lake partition tree.",
+    "remediation": "Segregate data lake directory hierarchy into data/raw/tables/{table_name}/... and data/raw/streams/{stream_name}/... ."
+  },
+  {
+    "id": "AUDIT-007",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "JSONL Append Lines Exceed 4,096-Byte Atomicity Limit Reaching 24,117 Bytes",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.log_event",
+      "src/data_lake/lake_manager.py:LakeManager.save_unstructured"
+    ],
+    "evidence": "823 out of 2,685 lines in data/raw/ exceed 4,096 bytes, reaching up to 24,117 bytes at data/raw/2026/07/08/events.jsonl:100. Concurrent multi-process appends interleave bytes across kernel buffers, producing corrupted JSON.",
+    "blast_radius": "Corrupts audit logs and event streams (events.jsonl, market_snapshot.jsonl), causing JSON decode errors in observability tools.",
+    "remediation": "Use file-locked append or route event writes through a single-writer logging daemon/queue."
+  },
+  {
+    "id": "AUDIT-008",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Silent Failure Swallowing via subprocess.run(check=False) in run_locked_subprocess",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess",
+      "src/scheduler.py:run_4h",
+      "src/scheduler.py:run_1d"
+    ],
+    "evidence": "src/scheduler.py:28 executes subprocess.run(args) with default check=False and no timeout. Non-zero exit codes from failed pipeline executions are silently ignored, triggering subsequent report builders and adaptive cadence shifts on stale state.",
+    "blast_radius": "Distorts execution reports and frequency controller state; leaves operators unaware of pipeline crashes.",
+    "remediation": "Set check=True and configure a bounded timeout (e.g. 600s) on subprocess.run. Abort subsequent report generation on non-zero exit codes."
+  },
+  {
+    "id": "AUDIT-009",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Destructive Truncation on Lock File Before Acquiring fcntl.flock",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "src/scheduler.py:24: with open(lock_path, 'w') as lock_file: truncates execution.lock before calling fcntl.flock(lock_file, fcntl.LOCK_EX). A second process opening the file truncates the active lockfile inode while the first process is running.",
+    "blast_radius": "Can invalidate lock file descriptors and cause race conditions across concurrent scheduler processes.",
+    "remediation": "Open lock file using mode 'a' or os.open with O_CREAT | O_RDWR."
+  },
+  {
+    "id": "AUDIT-010",
+    "category": "AST",
+    "severity": "MEDIUM",
+    "title": "171 Lines of Uncalled Dead Code Imported in Monolithic Pipeline",
+    "affected_symbols": [
+      "src/engines/feature_engine.py:sign_snapshot_payload",
+      "src/engines/feature_engine.py:check_mathematical_consistency",
+      "src/engines/feature_engine.py:append_to_immutable_chain",
+      "src/engines/feature_engine.py:compute_weekly_liquidity_boundaries",
+      "src/engines/feature_engine.py:calculate_model_tvd",
+      "src/engines/feature_engine.py:calculate_bayesian_conditional_probability",
+      "src/engines/feature_engine.py:compute_mcs"
+    ],
+    "evidence": "CodeGraph edge analysis confirms 0 calling edges for these 7 functions across the codebase. They are imported in src/fetch_market_data.py:35-41 but never executed.",
+    "blast_radius": "Increases maintenance burden, clutters symbol namespaces, and obscures actual operational logic.",
+    "remediation": "Purge uncalled dead functions from feature_engine.py and clean up unused import statements in fetch_market_data.py."
+  },
+  {
+    "id": "AUDIT-011",
+    "category": "AST",
+    "severity": "MEDIUM",
+    "title": "Superseded Root Modules (src/backtest.py, src/train_models.py) Emit Incompatible Artifacts",
+    "affected_symbols": [
+      "src/backtest.py:run_backtest",
+      "src/train_models.py",
+      "src/training/train_models.py"
+    ],
+    "evidence": "Root src/train_models.py trains VotingClassifier saving keys (model_mlp, model_rf, model_gb), which conflicts with FeatureEngine.load_mlp_models() expecting model_base, model_bull, model_bear. src/backtest.py imports from root train_models.py.",
+    "blast_radius": "Running deprecated root training scripts overwrites production model artifacts with incompatible formats, crashing run_mlp_inference.",
+    "remediation": "Deprecate and archive root src/train_models.py and src/backtest.py; standardize all model training on src/training/train_models.py."
+  },
+  {
+    "id": "AUDIT-012",
+    "category": "AST",
+    "severity": "MEDIUM",
+    "title": "Trading Settings Endpoint Writes to File Ignored by Quantitative Engine",
+    "affected_symbols": [
+      "src/api.py:get_trading_settings",
+      "src/api.py:update_trading_settings",
+      "src/fetch_market_data.py:Conductor.__init__"
+    ],
+    "evidence": "/api/trading_settings reads/writes config/trading_settings.json. However, Conductor reads active tickers from config/tickers.json and disabled tickers from data/state/trading_config.json. UI adjustments have zero operational effect.",
+    "blast_radius": "User configuration changes in Trading Terminal tab fail to apply to live trading rebalances.",
+    "remediation": "Point /api/trading_settings to update config/tickers.json or align Conductor to read config/trading_settings.json."
+  },
+  {
+    "id": "AUDIT-013",
+    "category": "Automation",
+    "severity": "MEDIUM",
+    "title": "next_run_time=datetime.now() Causes Rapid Cascading Subprocess Execution",
+    "affected_symbols": [
+      "src/scheduler.py:_apply_adaptive_frequency",
+      "src/engines/frequency_controller.py:FrequencyController.evaluate"
+    ],
+    "evidence": "src/scheduler.py:72, 76, 80: scheduler.add_job(..., next_run_time=datetime.now()) forces immediate execution upon frequency shift. FrequencyController hard-caps recommendations at '4h', never returning '1h', leaving the 1H adaptive branch dead.",
+    "blast_radius": "Triggers redundant, back-to-back resource-intensive pipeline executions when market metrics oscillate around regime boundaries.",
+    "remediation": "Schedule jobs for the next natural cron boundary instead of datetime.now(), and allow FrequencyController to emit '1h' when conditions warrant."
+  },
+  {
+    "id": "AUDIT-014",
+    "category": "Persistence",
+    "severity": "MEDIUM",
+    "title": "Unhandled JSONDecodeError in fetch_market_data.py:917 During Concurrent API Config Updates",
+    "affected_symbols": [
+      "src/api.py:update_trading_config",
+      "src/fetch_market_data.py:handle_pipeline_complete"
+    ],
+    "evidence": "src/api.py:578 writes trading_config.json directly via open('w'). src/fetch_market_data.py:917 reads the file with json.load(f) without a try-except block, causing an unhandled crash if read during a write.",
+    "blast_radius": "Direct crash of live rebalance execution pipeline on user ticker toggle.",
+    "remediation": "Wrap write in atomic file rename and add try-except fallback in fetch_market_data.py:917."
+  },
+  {
+    "id": "AUDIT-015",
+    "category": "Persistence",
+    "severity": "LOW",
+    "title": "Data Lake Ingestion Operates Exclusively as Write Sink Without Read Callers",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_tabular",
+      "src/fetch_market_data.py:handle_system_start",
+      "src/quantitative_backtester.py:run_backtest"
+    ],
+    "evidence": "System-wide call graph confirms zero read calls to raw_daily_ohlcv.parquet or raw_hourly_ohlcv.parquet. Live pipelines and backtesters continuously re-download historical data from external web APIs.",
+    "blast_radius": "Wasted disk I/O, increased network bandwidth, and vulnerability to external API rate limits and network outages.",
+    "remediation": "Implement a read-through local cache in YahooAdapter that queries LakeManager before making outbound network requests."
+  }
+]

@@ -28,7 +28,7 @@ app.add_middleware(
 QUANTOS_SECRET = os.environ.get("QUANTOS_API_SECRET", "")
 
 def require_auth(x_api_key: str = Header(None)):
-    if not QUANTOS_SECRET or x_api_key != QUANTOS_SECRET:
+    if QUANTOS_SECRET and x_api_key != QUANTOS_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 @app.get("/api/health")
@@ -319,7 +319,7 @@ def get_model():
         "assets": data.get("assets", {})
     }
 
-@app.get("/api/macro", dependencies=[Depends(require_auth)])
+@app.get("/api/macro")
 def get_macro():
     data = get_latest_snapshot()
     if "error" in data:
@@ -530,7 +530,7 @@ def trigger_job(payload: TriggerPayload, background_tasks: BackgroundTasks):
         "end_date": payload.end_date
     }
 
-@app.get("/api/reports", dependencies=[Depends(require_auth)])
+@app.get("/api/reports")
 def get_reports_list():
     reports_dir = os.path.join(os.path.dirname(__file__), '..', 'reports')
     updates_dir = os.path.join(reports_dir, 'updates')

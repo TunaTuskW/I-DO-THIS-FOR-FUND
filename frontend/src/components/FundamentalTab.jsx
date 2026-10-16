@@ -29,12 +29,13 @@ function FundamentalTabContent() {
         ) : (
           <div style={{ display: 'grid', gap: '16px' }}>
             {Object.entries(fundamentals).map(([ticker, data]) => {
-              if (data.reasoning === "Not an equity.") return null;
+              if (!data || typeof data !== 'object' || data.reasoning === "Not an equity.") return null;
               
-              const isPositive = data.conviction_score > 0;
-              const isNegative = data.conviction_score < 0;
+              const score = typeof data.conviction_score === 'number' ? data.conviction_score : 0;
+              const isPositive = score > 0;
+              const isNegative = score < 0;
               const scoreColor = isPositive ? 'var(--term-green)' : (isNegative ? 'var(--term-red)' : 'var(--text-bright)');
-              const scoreStr = (isPositive ? '+' : '') + data.conviction_score.toFixed(2);
+              const scoreStr = (isPositive ? '+' : '') + score?.toFixed(2);
 
               return (
                 <div key={ticker} style={{ padding: '16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
@@ -46,10 +47,10 @@ function FundamentalTabContent() {
                   </div>
                   
                   <p style={{ color: 'var(--text-main)', lineHeight: '1.5', marginBottom: '16px' }}>
-                    {data.reasoning}
+                    {data.reasoning || 'No qualitative reasoning available.'}
                   </p>
                   
-                  {data.insights && Object.keys(data.insights).length > 0 && (
+                  {data.insights && typeof data.insights === 'object' && Object.keys(data.insights).length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                       {Object.entries(data.insights).map(([key, value]) => (
                         <div key={key} style={{ padding: '12px', background: 'var(--bg-hover)', borderLeft: `2px solid ${scoreColor}` }}>

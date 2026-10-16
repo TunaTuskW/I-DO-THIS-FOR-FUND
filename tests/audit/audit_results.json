@@ -1,0 +1,189 @@
+{
+  "timestamp": "2026-10-16T08:40:59.554590+00:00",
+  "summary": {
+    "total_tests": 23,
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0,
+    "execution_time_seconds": 1.053
+  },
+  "tiers": {
+    "tier_1_ast_integrity": {
+      "name": "AST Architectural Topology & Call Graph Integrity",
+      "status": "PASSED",
+      "core_symbols_count": 14,
+      "unresolved_core_references": 0,
+      "kalman_mcs_connection_verified": true,
+      "dead_functions_verified": 6,
+      "tests_passed": 6
+    },
+    "tier_2_frontend_resilience": {
+      "name": "Frontend React UI & Malformed Payload Resilience",
+      "status": "PASSED",
+      "tab_components_tested": 10,
+      "components_with_error_boundary": 10,
+      "components_lacking_error_boundary": 0,
+      "null_trap_vulnerabilities_cataloged": 0,
+      "tests_passed": 8
+    },
+    "tier_3_persistence_integrity": {
+      "name": "Data Lake & Persistence Atomic Write Integrity",
+      "status": "PASSED",
+      "direct_open_w_locations": 3,
+      "raw_parquet_files_scanned": 70,
+      "distinct_parquet_schema_variations": 13,
+      "max_jsonl_line_length_bytes": 24066,
+      "posix_pipe_buf_limit_bytes": 4096,
+      "tests_passed": 5
+    },
+    "tier_4_scheduler_concurrency": {
+      "name": "Automation Scheduler & Concurrency Mutex Integrity",
+      "status": "PASSED",
+      "market_monitor_mutex_isolated": false,
+      "api_subprocess_mutex_isolated": false,
+      "child_return_code_suppressed": true,
+      "destructive_lock_truncation": true,
+      "tests_passed": 4
+    }
+  },
+  "tests": [
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_codegraph_sync_and_status",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0039
+    },
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_core_symbols_zero_unresolved_refs",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0069
+    },
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_critical_execution_path_connectivity",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0289
+    },
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_kalman_and_mcs_pipeline_disconnection",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0358
+    },
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_dead_functions_catalog",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0175
+    },
+    {
+      "nodeid": "tests/audit/test_ast_integrity.py::test_deprecated_modules_and_endpoints",
+      "tier": "tier_1_ast_integrity",
+      "outcome": "passed",
+      "duration": 0.0003
+    },
+    {
+      "nodeid": "tests/audit/test_atomic_persistence.py::test_non_atomic_state_dumps_ast",
+      "tier": "tier_3_persistence_integrity",
+      "outcome": "passed",
+      "duration": 0.0103
+    },
+    {
+      "nodeid": "tests/audit/test_atomic_persistence.py::test_direct_open_w_truncation_hazard",
+      "tier": "tier_3_persistence_integrity",
+      "outcome": "passed",
+      "duration": 0.001
+    },
+    {
+      "nodeid": "tests/audit/test_atomic_persistence.py::test_parquet_schema_drift_detection",
+      "tier": "tier_3_persistence_integrity",
+      "outcome": "passed",
+      "duration": 0.1225
+    },
+    {
+      "nodeid": "tests/audit/test_atomic_persistence.py::test_jsonl_posix_line_length_atomicity_hazard",
+      "tier": "tier_3_persistence_integrity",
+      "outcome": "passed",
+      "duration": 0.0498
+    },
+    {
+      "nodeid": "tests/audit/test_atomic_persistence.py::test_data_lake_partition_format_pollution",
+      "tier": "tier_3_persistence_integrity",
+      "outcome": "passed",
+      "duration": 0.0068
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_all_10_tab_components_exist",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0001
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_frontend_error_boundary_protections",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0015
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_overview_tab_payload_resilience",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0027
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_trading_terminal_payload_resilience",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.003
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_paper_trading_tab_payload_resilience_and_null_fallacy",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0042
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_macro_fundamental_math_tabs_resilience",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0071
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_diagnostics_reports_settings_pipeline_tabs_resilience",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0002
+    },
+    {
+      "nodeid": "tests/audit/test_frontend_resilience.py::test_component_resilience_matrix_summary",
+      "tier": "tier_2_frontend_resilience",
+      "outcome": "passed",
+      "duration": 0.0234
+    },
+    {
+      "nodeid": "tests/audit/test_scheduler_concurrency.py::test_market_monitor_and_api_lock_bypass",
+      "tier": "tier_4_scheduler_concurrency",
+      "outcome": "passed",
+      "duration": 0.0002
+    },
+    {
+      "nodeid": "tests/audit/test_scheduler_concurrency.py::test_scheduler_exception_isolation_suppression",
+      "tier": "tier_4_scheduler_concurrency",
+      "outcome": "passed",
+      "duration": 0.0304
+    },
+    {
+      "nodeid": "tests/audit/test_scheduler_concurrency.py::test_scheduler_lockfile_destructive_truncation",
+      "tier": "tier_4_scheduler_concurrency",
+      "outcome": "passed",
+      "duration": 0.0009
+    },
+    {
+      "nodeid": "tests/audit/test_scheduler_concurrency.py::test_scheduler_market_monitor_concurrency_collision",
+      "tier": "tier_4_scheduler_concurrency",
+      "outcome": "passed",
+      "duration": 0.0821
+    }
+  ]
+}

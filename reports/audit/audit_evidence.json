@@ -1,0 +1,341 @@
+[
+  {
+    "id": "AUDIT-001",
+    "category": "AST",
+    "severity": "CRITICAL",
+    "title": "Kalman Filter and MCS Pipeline Disconnection in Conductor",
+    "affected_symbols": [
+      "src/fetch_market_data.py:Conductor",
+      "src/engines/risk_engine.py:RiskEngine.compute_multi_asset_kelly",
+      "src/engines/feature_engine.py:compute_mcs"
+    ],
+    "evidence": "In src/fetch_market_data.py lines 514, 562, 646: self.snapshot.kalman_state is initialized to default KalmanState() and risk_engine.run_kalman_filter() is never invoked. Conductor passes dominant_state='UNKNOWN' into RiskEngine.compute_multi_asset_kelly() and EntryEngine.score_entry(). Furthermore, compute_mcs is imported at line 41 but never called in Conductor.",
+    "blast_radius": "Affects 26 downstream symbols. In live execution, regime-specific risk-off capital preservation is completely bypassed, resulting in unhedged equity drawdowns while the backtester (quantitative_backtester.py) executes Kalman and MCS properly.",
+    "remediation": "1. In src/fetch_market_data.py, invoke self.snapshot.kalman_state = self.risk_engine.run_kalman_filter(macro_features) prior to Kelly sizing.\n2. Invoke compute_mcs(self.features_vector) and assign to self.snapshot.mcs.\n3. Pass the resolved dominant_state to compute_multi_asset_kelly and score_entry."
+  },
+  {
+    "id": "AUDIT-002",
+    "category": "AST",
+    "severity": "HIGH",
+    "title": "Monolithic Conductor High-Fanout Orchestrator Bottleneck",
+    "affected_symbols": [
+      "src/fetch_market_data.py:Conductor"
+    ],
+    "evidence": "src/fetch_market_data.py:86-180: Conductor directly instantiates 12 quantitative engines, 3 broker/data adapters, data lake persistence, and event bus in a single 1000+ line monolithic class with direct state mutations across all pipeline phases.",
+    "blast_radius": "Tight coupling across entire system (>15 engines). Any schema or engine signature modification requires touching Conductor internals, creating high testing regression risk.",
+    "remediation": "Decompose Conductor into distinct pipeline stages using a modular middleware or chain-of-responsibility pattern: IngestionStage, FeatureStage, InferenceStage, RiskStage, and ExecutionStage."
+  },
+  {
+    "id": "AUDIT-003",
+    "category": "AST",
+    "severity": "MEDIUM",
+    "title": "Configuration Mechanism Drift Between TradingTerminal and Conductor",
+    "affected_symbols": [
+      "src/api.py:/api/trading_settings",
+      "frontend/src/components/TradingTerminal.jsx:toggleTicker",
+      "src/fetch_market_data.py:Conductor.__init__"
+    ],
+    "evidence": "TradingTerminal.jsx toggles tickers via GET/POST /api/trading_settings which reads/writes config/trading_settings.json (src/api.py:412-430). However, Conductor in fetch_market_data.py:103 reads active tickers from config/tickers.json and disabled tickers from data/state/trading_config.json.",
+    "blast_radius": "User interactions in the trading terminal UI fail silently; live backend execution ignores trading_settings.json completely.",
+    "remediation": "Unify configuration paths: refactor /api/trading_settings to read and write config/tickers.json and data/state/trading_config.json, or update Conductor to consume trading_settings.json."
+  },
+  {
+    "id": "AUDIT-004",
+    "category": "AST",
+    "severity": "LOW",
+    "title": "Dead Functions in Feature Engine",
+    "affected_symbols": [
+      "src/engines/feature_engine.py:sign_snapshot_payload",
+      "src/engines/feature_engine.py:check_mathematical_consistency",
+      "src/engines/feature_engine.py:append_to_immutable_chain",
+      "src/engines/feature_engine.py:compute_weekly_liquidity_boundaries",
+      "src/engines/feature_engine.py:calculate_model_tvd",
+      "src/engines/feature_engine.py:calculate_bayesian_conditional_probability"
+    ],
+    "evidence": "AST queries in CodeGraph confirm zero call sites across the codebase for sign_snapshot_payload (line 73), check_mathematical_consistency (line 77), append_to_immutable_chain (line 90), compute_weekly_liquidity_boundaries (line 456), calculate_model_tvd (line 484), and calculate_bayesian_conditional_probability (line 516).",
+    "blast_radius": "6 unreferenced functions bloat codebase maintenance surface and confuse developers regarding active mathematical models.",
+    "remediation": "Deprecate and remove dead functions from feature_engine.py; clean up unused imports in src/fetch_market_data.py."
+  },
+  {
+    "id": "AUDIT-005",
+    "category": "AST",
+    "severity": "LOW",
+    "title": "Deprecated Legacy Modules and Orphaned Utilities",
+    "affected_symbols": [
+      "src/backtest.py:run_backtest",
+      "src/train_models.py",
+      "src/tune_hyperparameters.py",
+      "src/visualize_paper_trading.py",
+      "src/generate_visual_map.py"
+    ],
+    "evidence": "src/backtest.py has been superseded by src/quantitative_backtester.py; src/train_models.py trains an unused VotingClassifier superseded by src/training/train_models.py; tune_hyperparameters.py references non-existent config/api_keys.json.",
+    "blast_radius": "5 standalone files containing out-of-sync duplicate logic and incompatible configurations.",
+    "remediation": "Move obsolete scripts to a legacy/ archive directory or delete them from source tree, updating documentation to point to active tools."
+  },
+  {
+    "id": "AUDIT-006",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "Unhandled Null/Undefined API Payload Vulnerabilities",
+    "affected_symbols": [
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/TradingTerminal.jsx",
+      "frontend/src/components/PaperTradingTab.jsx",
+      "frontend/src/App.jsx"
+    ],
+    "evidence": "OverviewTab.jsx:14 calls data.regime.replace(/_/g, ' ') and lines 106, 110 call data.decision.entry_score.toFixed(2); TradingTerminal.jsx:35 calls data.active_tickers.map(...); PaperTradingTab.jsx:134 dereferences portfolio.total_equity and lines 222, 246 evaluate portfolio.win_rate !== undefined (which evaluates to true for null), immediately executing (null).toFixed() and throwing TypeError.",
+    "blast_radius": "A single null field or partial JSON response from FastAPI unmounts the entire React root tree, locking the user out of the dashboard.",
+    "remediation": "Implement defensive optional chaining (?.) and default null-coalescing (??) across all numeric formatting, string transformations, and array iterations: (data?.regime ?? 'UNKNOWN').replace(), (portfolio?.win_rate ?? 0).toFixed(1)."
+  },
+  {
+    "id": "AUDIT-007",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "Missing Error Boundary Coverage Across 6 Tabs and Root Shell",
+    "affected_symbols": [
+      "frontend/src/App.jsx:121-131",
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/TradingTerminal.jsx",
+      "frontend/src/components/PaperTradingTab.jsx",
+      "frontend/src/components/DiagnosticsTab.jsx",
+      "frontend/src/components/SettingsTab.jsx",
+      "frontend/src/components/ReportsTab.jsx"
+    ],
+    "evidence": "Only MacroTab, FundamentalTab, MathModelTab, and PipelineVisualizer are wrapped in ErrorBoundary. The App shell and 6 out of 10 tab views render without error boundaries in App.jsx lines 121-131.",
+    "blast_radius": "Any runtime exception in 60% of tabs crashes the entire SPA into a blank white screen with no fallback UI or recovery action.",
+    "remediation": "Wrap the main tab container and each individual tab view in ErrorBoundary with dedicated fallback recovery buttons."
+  },
+  {
+    "id": "AUDIT-008",
+    "category": "Frontend",
+    "severity": "CRITICAL",
+    "title": "WebSocket Telemetry Lifecycle Breakdown and Heartbeat State Eviction",
+    "affected_symbols": [
+      "frontend/src/components/PipelineVisualizer.jsx:9-35",
+      "src/api.py:/api/ws/pipeline"
+    ],
+    "evidence": "PipelineVisualizer.jsx establishes native WebSocket with no onclose or onerror reconnect handlers. Heartbeats sent by src/api.py:75 ({\"type\": \"heartbeat\"}) pass data.component as undefined, causing setActiveComponent(undefined) (clearing SVG active node highlights) and appending heartbeats to logs array, evicting real pipeline logs from the 20-entry circular buffer.",
+    "blast_radius": "Telemetry permanently dies on first network interruption; active pipeline visualizer nodes flicker off every 3 seconds.",
+    "remediation": "1. Add exponential backoff auto-reconnect onclose/onerror.\n2. Filter out heartbeat messages: if (data.type === 'heartbeat') return;\n3. Safely check readyState before closing in useEffect cleanup."
+  },
+  {
+    "id": "AUDIT-009",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "Missing Development Reverse Proxy in Vite Configuration",
+    "affected_symbols": [
+      "frontend/vite.config.js"
+    ],
+    "evidence": "frontend/vite.config.js contains plugins: [react()] with zero server proxy settings. In local dev (port 5173), fetch('/api/*') and WebSocket connections to ws://localhost:5173/api/ws/pipeline fail with 404 or connection refused.",
+    "blast_radius": "Breaks local frontend development environment; frontend cannot communicate with backend without custom external Nginx proxy.",
+    "remediation": "Add server.proxy configuration in vite.config.js mapping /api and /api/ws to http://localhost:8000 and ws://localhost:8000 with ws: true and changeOrigin: true."
+  },
+  {
+    "id": "AUDIT-010",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "Ghost CSS Classes and Collapsed Regime Progress Bars",
+    "affected_symbols": [
+      "frontend/src/index.css",
+      "frontend/src/components/MathModelTab.jsx:27-28",
+      "frontend/src/components/OverviewTab.jsx",
+      "frontend/src/components/ReportsTab.jsx:102,112"
+    ],
+    "evidence": "Classes .text-plasma-green, .text-plasma-red, .text-plasma-cyan, .text-plasma-purple, .text-plasma-amber, .text-purple, .btn-primary, .btn-danger, .progress-bg, and .progress-fill do not exist in index.css. In MathModelTab.jsx lines 27-28, regime progress bars render at 0px height (invisible); buttons in ReportsTab render unstyled.",
+    "blast_radius": "Core quantitative visual indicators (HMM regime probabilities) are completely invisible to traders; UI buttons lack affordance.",
+    "remediation": "Define missing CSS classes in index.css: set .progress-bg with height: 6px and background; .progress-fill with height: 100%; implement .btn-primary and .btn-danger styling."
+  },
+  {
+    "id": "AUDIT-011",
+    "category": "Frontend",
+    "severity": "HIGH",
+    "title": "API Secret Key Input Missing from System Configuration UI",
+    "affected_symbols": [
+      "frontend/src/components/SettingsTab.jsx:12,63,85"
+    ],
+    "evidence": "SettingsTab.jsx declares apiSecret state and saves to localStorage.setItem('quantos_api_key', apiSecret) at line 63, but completely omits an <input> element for apiSecret in JSX lines 85-136.",
+    "blast_radius": "When backend QUANTOS_SECRET authentication is activated, users have no visual UI mechanism to configure credentials, permanently blocking manual trigger actions.",
+    "remediation": "Add a password input field for QuantOS API Secret in SettingsTab.jsx bound to apiSecret and setApiSecret."
+  },
+  {
+    "id": "AUDIT-012",
+    "category": "Frontend",
+    "severity": "MEDIUM",
+    "title": "Cascading 1000ms Clock Re-Render Loop in Application Root",
+    "affected_symbols": [
+      "frontend/src/App.jsx:66-69"
+    ],
+    "evidence": "frontend/src/App.jsx lines 66-69 executes setInterval(..., 1000) modifying clock state in the root App component every second. Because child tabs are not memoized with React.memo, the entire active tab reconciles every second.",
+    "blast_radius": "Continuous 1Hz virtual DOM re-evaluation causes CPU churn, battery drain, and unnecessary SVG/chart canvas reconciliations.",
+    "remediation": "Extract the clock display into an isolated leaf component (<ClockDisplay timeZone={timeZone} />) with local state, removing clock state from App.jsx."
+  },
+  {
+    "id": "AUDIT-013",
+    "category": "Frontend",
+    "severity": "MEDIUM",
+    "title": "Global setInterval Variable Shadowing in TradingTerminal",
+    "affected_symbols": [
+      "frontend/src/components/TradingTerminal.jsx:23"
+    ],
+    "evidence": "frontend/src/components/TradingTerminal.jsx:23 declares const [interval, setInterval] = useState('D'), which shadows window.setInterval inside the component scope.",
+    "blast_radius": "Any timer call inside TradingTerminal invokes the React state setter rather than window.setInterval, creating silent timer failures.",
+    "remediation": "Rename state hook to const [chartInterval, setChartInterval] = useState('D')."
+  },
+  {
+    "id": "AUDIT-014",
+    "category": "Persistence",
+    "severity": "CRITICAL",
+    "title": "Destructive Non-Atomic State Overwrite Hazards",
+    "affected_symbols": [
+      "src/adapters/paper_broker.py:PaperBroker._save_portfolio",
+      "src/fundamental_agent/main.py:49",
+      "src/api.py:578",
+      "src/api.py:427"
+    ],
+    "evidence": "paper_broker.py:56 writes paper_portfolio.json directly via open(self.portfolio_path, 'w') + json.dump; fundamental_agent/main.py:49 writes fundamental_scores.json via open(..., 'w'); api.py writes trading_config.json via open(..., 'w'). None of these use atomic tempfile+replace.",
+    "blast_radius": "If process crashes or API reads file while being written, file is truncated to 0 bytes, permanently erasing paper trading cash, positions, and user trading configurations.",
+    "remediation": "Implement centralized atomic_write_json utility utilizing tempfile.mkstemp, flush, os.fsync, and os.replace across all state writers."
+  },
+  {
+    "id": "AUDIT-015",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "Data Lake Parquet Schema Drift Across 70 Daily Files",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_tabular",
+      "data/raw/YYYY/MM/DD/raw_daily_ohlcv.parquet"
+    ],
+    "evidence": "Inspection of all 70 daily Parquet files in data/raw/ identifies 13 distinct schema signatures with column counts fluctuating from 161 to 212. Caused by unconstrained ticker additions and unordered column flattening of yfinance MultiIndex in lake_manager.py:35-36.",
+    "blast_radius": "Vectorized analytics engines (PyArrow Dataset, DuckDB, Polars) fail with SchemaError when scanning across multiple partitions.",
+    "remediation": "Enforce canonical sorted column ordering in LakeManager.save_tabular; implement schema backfilling and validation against a strict Pydantic/PyArrow schema."
+  },
+  {
+    "id": "AUDIT-016",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "Partition Directory Contamination Breaking Multi-File Dataset Scans",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:LakeManager.save_unstructured",
+      "data/raw/YYYY/MM/DD/"
+    ],
+    "evidence": "lake_manager.py writes both tabular Parquet files (raw_daily_ohlcv.parquet) and JSONL files (events.jsonl, market_snapshot.jsonl) into the exact same partition directory. pyarrow.dataset.dataset('data/raw', format='parquet') immediately crashes on events.jsonl.",
+    "blast_radius": "Completely disables partition-wide SQL queries and parquet dataset ingestion pipelines.",
+    "remediation": "Segregate tabular and unstructured datasets into distinct storage roots: data/raw/ohlcv/YYYY/MM/DD/ and data/raw/events/YYYY/MM/DD/."
+  },
+  {
+    "id": "AUDIT-017",
+    "category": "Persistence",
+    "severity": "HIGH",
+    "title": "JSONL Records Exceeding 4096B POSIX Atomic Append Boundary",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py:89",
+      "data/raw/YYYY/MM/DD/market_snapshot.jsonl"
+    ],
+    "evidence": "lake_manager.py:89 appends serialized snapshots measuring up to 24,066 bytes using open(..., 'a'). POSIX guarantees write atomicity only up to PIPE_BUF (4,096 bytes). Concurrent appends split large records, corrupting JSONL syntax.",
+    "blast_radius": "Corrupts market_snapshot.jsonl log streams under concurrent execution cycles, breaking downstream JSON parsers.",
+    "remediation": "Protect JSONL appends with fcntl.flock on a dedicated log lock file, or buffer writes through a synchronized queue."
+  },
+  {
+    "id": "AUDIT-018",
+    "category": "Persistence",
+    "severity": "MEDIUM",
+    "title": "Write-Only 'Black Hole' Data Lake Anti-Pattern",
+    "affected_symbols": [
+      "src/data_lake/lake_manager.py",
+      "src/fetch_market_data.py",
+      "src/quantitative_backtester.py:75"
+    ],
+    "evidence": "LakeManager writes Parquet partitions on every execution cycle, but no module in QuantOS ever reads from the Parquet data lake. fetch_market_data.py and quantitative_backtester.py repeatedly download historical bars from external APIs over the network.",
+    "blast_radius": "Consumes disk I/O and storage without operational utility; leaves entire system vulnerable to external API rate limits and network outages.",
+    "remediation": "Refactor YahooAdapter and Backtester to implement a read-through local cache that queries local Parquet partitions before issuing network requests."
+  },
+  {
+    "id": "AUDIT-019",
+    "category": "Persistence",
+    "severity": "MEDIUM",
+    "title": "Partial Atomic Write Utility Lacking fsync Flush",
+    "affected_symbols": [
+      "src/fetch_market_data.py:atomic_json_write"
+    ],
+    "evidence": "atomic_json_write in fetch_market_data.py:48-61 writes tempfile and executes os.replace without calling f.flush() and os.fsync(fd). In POSIX filesystems, directory entry rename can commit before dirty page cache blocks are flushed.",
+    "blast_radius": "Sudden process termination, power loss, or OS crash can leave a 0-byte or corrupted file at destination path.",
+    "remediation": "Add f.flush() and os.fsync(f.fileno()) immediately prior to os.replace."
+  },
+  {
+    "id": "AUDIT-020",
+    "category": "Automation",
+    "severity": "CRITICAL",
+    "title": "Concurrency Collision Between Market Monitor and Scheduled Cron",
+    "affected_symbols": [
+      "src/market_monitor.py:112",
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "scheduler.py protects scheduled jobs with execution.lock via fcntl.flock. However, market_monitor.py:112 executes subprocess.run(['python3', 'src/fetch_market_data.py', '--interval', '1h']) upon volatility or stop loss triggers WITHOUT acquiring execution.lock.",
+    "blast_radius": "Dual concurrent execution of fetch_market_data.py collides on paper_portfolio.json, paper_ledger.csv, and Parquet files, causing duplicate orders, double-spent cash, and data corruption.",
+    "remediation": "Refactor market_monitor.py to invoke fetch_market_data.py via run_locked_subprocess with non-blocking check and exponential backoff retry."
+  },
+  {
+    "id": "AUDIT-021",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Unbounded Blocking Wait and Mutex Truncation on Open",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess"
+    ],
+    "evidence": "run_locked_subprocess opens lock_file with open(lock_path, 'w') which truncates the lockfile inode while held by another process. Furthermore, fcntl.flock(lock_file, fcntl.LOCK_EX) blocks indefinitely with no timeout.",
+    "blast_radius": "A hung network request in a child process blocks the APScheduler worker thread permanently, exhausting the 10-worker pool and freezing the entire automation engine.",
+    "remediation": "Open lock file in append mode ('a'); add subprocess.run(timeout=600); implement non-blocking lock acquisition with retry timeout."
+  },
+  {
+    "id": "AUDIT-022",
+    "category": "Automation",
+    "severity": "HIGH",
+    "title": "Scheduler Child Process Failure Suppression and Blind Cascade",
+    "affected_symbols": [
+      "src/scheduler.py:run_locked_subprocess",
+      "src/scheduler.py:run_4h",
+      "src/scheduler.py:run_1d"
+    ],
+    "evidence": "run_locked_subprocess executes subprocess.run(args) with default check=False and ignores returncode. In run_4h, if fetch_market_data.py exits with error code 1, the scheduler immediately executes build_report.py and _apply_adaptive_frequency() against missing or stale state.",
+    "blast_radius": "Errors are silently masked; misleading reports are generated; cadence adaptation acts on stale data.",
+    "remediation": "Check completed_process.returncode == 0; raise RuntimeError or log alert and abort downstream report generation and frequency adaptation on failure."
+  },
+  {
+    "id": "AUDIT-023",
+    "category": "Automation",
+    "severity": "MEDIUM",
+    "title": "Broken Mutex Boundary on Report Generation",
+    "affected_symbols": [
+      "src/scheduler.py:run_4h",
+      "src/scheduler.py:run_1d"
+    ],
+    "evidence": "In run_4h and run_1d, execution.lock is released immediately after fetch_market_data.py completes. build_report.py is executed outside the lock, allowing a newly triggered 1H job to rewrite snapshot files while build_report is reading them.",
+    "blast_radius": "Race condition corrupts generated markdown execution reports and visual maps.",
+    "remediation": "Extend execution.lock context to encapsulate both fetch_market_data.py and build_report.py."
+  },
+  {
+    "id": "AUDIT-024",
+    "category": "Automation",
+    "severity": "MEDIUM",
+    "title": "Adaptive Frequency Rapid Execution Cascade",
+    "affected_symbols": [
+      "src/scheduler.py:_apply_adaptive_frequency"
+    ],
+    "evidence": "In scheduler.py:71-100, when frequency changes, the job is re-added with next_run_time=datetime.now(), forcing immediate execution. If market metrics oscillate, this triggers rapid back-to-back pipeline executions.",
+    "blast_radius": "Spams external market APIs (Yahoo Finance, Fred), exhausts rate limits, and spikes CPU usage.",
+    "remediation": "Calculate next regular cron interval for newly selected cadence instead of forcing immediate execution."
+  },
+  {
+    "id": "AUDIT-025",
+    "category": "Automation",
+    "severity": "LOW",
+    "title": "Frequency Controller Hard-Cap at 4H Disconnecting 1H Mode",
+    "affected_symbols": [
+      "src/engines/frequency_controller.py:evaluate",
+      "src/scheduler.py:_apply_adaptive_frequency"
+    ],
+    "evidence": "src/engines/frequency_controller.py:90-98 hard-caps recommended execution frequency at '4h' even for maximum volatility scores. Consequently, the '1h' branch in scheduler.py:87-90 is unreachable dead code in production.",
+    "blast_radius": "Intra-cycle 1H execution mode is disabled despite scheduler support, preventing agile risk reallocation during extreme volatility events.",
+    "remediation": "Update frequency_controller.py: if score >= 4 and enable_1h_mode: return '1h'."
+  }
+]

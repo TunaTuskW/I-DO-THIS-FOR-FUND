@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 
-export default function PipelineVisualizer() {
+function PipelineVisualizerContent() {
   const [logs, setLogs] = useState([]);
   const [activeComponent, setActiveComponent] = useState(null);
   const [activeMessage, setActiveMessage] = useState("");
@@ -16,12 +17,13 @@ export default function PipelineVisualizer() {
     wsRef.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        setLogs(prev => [...prev, data].slice(-20)); // Keep last 20 logs for brief display
+        if (data?.type === 'heartbeat') return; // Filter heartbeat events to avoid overwriting active nodes
+        setLogs(prev => [...(prev || []), data]?.slice(-20)); // Keep last 20 logs for brief display
         
-        setActiveComponent(data.component);
-        setActiveMessage(data.message);
+        setActiveComponent(data?.component || null);
+        setActiveMessage(data?.message || "");
 
-        if (data.message && data.message.includes("Complete")) {
+        if (data?.message && data.message.includes("Complete")) {
             setActiveComponent("complete");
         }
       } catch (e) {
@@ -36,7 +38,7 @@ export default function PipelineVisualizer() {
 
   const isActive = (components) => {
     if (activeComponent === "complete") return false;
-    return components.includes(activeComponent);
+    return (components || []).includes(activeComponent);
   };
 
   const isComplete = activeComponent === "complete";
@@ -59,7 +61,7 @@ export default function PipelineVisualizer() {
           boxShadow: active ? `0 0 25px ${highlightColor}80, inset 0 0 10px ${highlightColor}40` : '0 4px 6px rgba(0,0,0,0.1)',
           color: active ? highlightColor : '#aaa'
         }}>
-          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>{label.charAt(0)}</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>{(label || '').charAt(0)}</span>
         </div>
         <span style={{ fontSize: '0.75rem', fontWeight: active ? 'bold' : 'normal', color: active ? '#fff' : '#888', textShadow: active ? `0 0 5px ${highlightColor}` : 'none' }}>
           {label}
@@ -142,14 +144,22 @@ export default function PipelineVisualizer() {
       </div>
       
       <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.75rem', color: '#aaa', maxHeight: '150px', overflowY: 'auto' }}>
-        {logs.filter(log => log.component || log.message).map((log, i) => (
+        {(logs || []).filter(log => log?.component || log?.message)?.map((log, i) => (
           <div key={i} style={{ marginBottom: '4px' }}>
-            <span style={{ color: '#555' }}>{log.timestamp}</span>{' '}
-            {log.component && <span style={{ color: log.level === 'ERROR' ? '#ff4444' : log.level === 'WARNING' ? '#ffb86c' : '#00f0ff' }}>[{log.component}]</span>}{' '}
-            {log.message}
+            <span style={{ color: '#555' }}>{log?.timestamp}</span>{' '}
+            {log?.component && <span style={{ color: log?.level === 'ERROR' ? '#ff4444' : log?.level === 'WARNING' ? '#ffb86c' : '#00f0ff' }}>[{log?.component}]</span>}{' '}
+            {log?.message}
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+export default function PipelineVisualizer(props) {
+  return (
+    <ErrorBoundary>
+      <PipelineVisualizerContent {...props} />
+    </ErrorBoundary>
   );
 }

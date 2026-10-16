@@ -30,3 +30,17 @@ __pycache__/
 *.pyo
 *.pyd
 node_modules/
+
+# Agent session & test runs
+.agents/
+.pytest_cache/
+
+# Large binary datasets & SQLite databases
+*.parquet
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/cache_5000h_ohlcv.parquet
+data/paper_trading/*.db
+data/paper_trading/*.parquet

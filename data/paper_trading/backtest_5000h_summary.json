@@ -1,0 +1,23 @@
+{
+    "summary": {
+        "initial_capital": 10000.0,
+        "final_equity": 11428.39,
+        "total_return_pct": 14.28,
+        "spx_buy_and_hold_return_pct": 64.02,
+        "alpha_vs_spx": -49.74,
+        "sharpe_ratio": 0.67,
+        "sortino_ratio": 0.82,
+        "max_drawdown_pct": 4.06,
+        "active_win_rate_pct": 67.18,
+        "profit_factor": 1.28,
+        "total_trades": 530,
+        "total_slippage_fees": 713.81,
+        "circuit_breaker_trips": 0,
+        "conviction_blocks": 1125,
+        "total_bars_evaluated": 4857,
+        "start_time": "2024-01-03 17:30:00",
+        "end_time": "2026-10-15 19:30:00",
+        "diagnostic_alerts_count": 0
+    },
+    "diagnostic_alerts": []
+}

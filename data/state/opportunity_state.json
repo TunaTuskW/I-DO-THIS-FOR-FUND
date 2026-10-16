@@ -1,5 +1,27 @@
 {
     "prev_entry_score": 0.5,
     "prev_regime": "UNKNOWN_TRANSITION",
-    "evaluated_utc": "2026-07-09T06:00:40.238817+00:00"
+    "evaluated_utc": "2026-10-16T05:23:45.870991+00:00",
+    "kalman_dominant_state": "transitional",
+    "kalman_probabilities": [
+        0.21217218303490687,
+        0.21217218303490684,
+        0.5756556339301864
+    ],
+    "mcs": {
+        "score": 32.09,
+        "sub_components": {
+            "equity_momentum": 0.227,
+            "rate_pressure": -4.667,
+            "energy_stress": 14.35,
+            "cross_asset_coherence": 25.0
+        },
+        "entropy": 1.374,
+        "entropy_vector": [
+            0.005,
+            0.105,
+            0.324,
+            0.565
+        ]
+    }
 }

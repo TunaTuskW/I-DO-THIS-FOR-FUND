@@ -8,6 +8,7 @@ import DiagnosticsTab from './components/DiagnosticsTab';
 import SettingsTab from './components/SettingsTab';
 import ReportsTab from './components/ReportsTab';
 import FundamentalTab from './components/FundamentalTab';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 // Auth helper — reads stored key from localStorage (set in Settings tab)
@@ -78,8 +79,8 @@ function App() {
         
         <div className="header-center">
           <span className="text-muted">REGIME:</span>
-          <span className="text-cyan">{data.regime.replace(/_/g, ' ')}</span>
-          <span className="text-purple">{(data.regimeProb * 100).toFixed(1)}%</span>
+          <span className="text-cyan">{data?.regime ? data.regime.replace(/_/g, ' ') : 'UNKNOWN'}</span>
+          <span className="text-purple">{((data?.regimeProb ?? 0) * 100).toFixed(1)}%</span>
         </div>
 
         <div className="header-right">
@@ -99,7 +100,7 @@ function App() {
           </select><span className="text-muted" style={{marginLeft: "8px"}}>{clock}</span>
           <div className="status-beacon">
             <div className="status-dot"></div>
-            {data.status.toUpperCase()}
+            {data?.status ? data.status.toUpperCase() : 'SYNCING'}
           </div>
         </div>
       </header>
@@ -119,15 +120,51 @@ function App() {
 
       {/* Main Tab Content */}
       <main>
-        {activeTab === 'overview' && <OverviewTab data={data} timeZone={timeZone} />}
-        {activeTab === 'terminal' && <TradingTerminal timeZone={timeZone} />}
-        {activeTab === 'trading' && <PaperTradingTab timeZone={timeZone} />}
-        {activeTab === 'macro' && <MacroTab timeZone={timeZone} />}
-        {activeTab === 'fundamentals' && <FundamentalTab />}
-        {activeTab === 'model' && <MathModelTab timeZone={timeZone} />}
-        {activeTab === 'logs' && <DiagnosticsTab timeZone={timeZone} />}
-        {activeTab === 'reports' && <ReportsTab timeZone={timeZone} />}
-        {activeTab === 'settings' && <SettingsTab />}
+        {activeTab === 'overview' && (
+          <ErrorBoundary>
+            <OverviewTab data={data} timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'terminal' && (
+          <ErrorBoundary>
+            <TradingTerminal timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'trading' && (
+          <ErrorBoundary>
+            <PaperTradingTab timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'macro' && (
+          <ErrorBoundary>
+            <MacroTab timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'fundamentals' && (
+          <ErrorBoundary>
+            <FundamentalTab />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'model' && (
+          <ErrorBoundary>
+            <MathModelTab timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'logs' && (
+          <ErrorBoundary>
+            <DiagnosticsTab timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'reports' && (
+          <ErrorBoundary>
+            <ReportsTab timeZone={timeZone} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'settings' && (
+          <ErrorBoundary>
+            <SettingsTab />
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );

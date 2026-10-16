@@ -4,7 +4,7 @@ import PipelineVisualizer from './PipelineVisualizer';
 import ErrorBoundary from './ErrorBoundary';
 import { apiPost } from '../App';
 
-export default function ReportsTab({ timeZone }) {
+function ReportsTabContent({ timeZone }) {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportContent, setReportContent] = useState('');
@@ -15,10 +15,10 @@ export default function ReportsTab({ timeZone }) {
       const res = await fetch('/api/reports');
       if (res.ok) {
         const json = await res.json();
-        const list = json.reports || [];
+        const list = Array.isArray(json?.reports) ? json.reports : [];
         setReports(list);
         if (list.length > 0 && !selectedReport) {
-          handleSelectReport(list[0].filename);
+          handleSelectReport(list[0]?.filename);
         }
       }
     } catch (e) {
@@ -27,6 +27,7 @@ export default function ReportsTab({ timeZone }) {
   };
 
   const handleSelectReport = async (filename) => {
+    if (!filename) return;
     setSelectedReport(filename);
     setReportContent('Loading...');
     try {
@@ -45,12 +46,12 @@ export default function ReportsTab({ timeZone }) {
     setTriggerStatus({ type: 'loading', msg: `Dispatching ${jobName}...` });
     try {
       const res = await apiPost('/api/trigger', { job: jobName });
-      if (res.ok) {
+      if (res?.ok) {
         setTriggerStatus({ type: 'ok', msg: `${jobName} launched in background — check Diagnostics for output.` });
         setTimeout(() => setTriggerStatus(null), 6000);
       } else {
-        const body = await res.json().catch(() => ({}));
-        setTriggerStatus({ type: 'err', msg: `Failed: ${body.detail || res.status}` });
+        const body = await res?.json().catch(() => ({}));
+        setTriggerStatus({ type: 'err', msg: `Failed: ${body?.detail || res?.status}` });
         setTimeout(() => setTriggerStatus(null), 6000);
       }
     } catch (e) {
@@ -63,7 +64,7 @@ export default function ReportsTab({ timeZone }) {
     fetchReports();
   }, []);
 
-  const formatSize = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
+  const formatSize = (bytes) => `${((bytes || 0) / 1024).toFixed(1)} KB`;
 
   const statusIcon = () => {
     if (!triggerStatus) return null;
@@ -77,6 +78,8 @@ export default function ReportsTab({ timeZone }) {
     if (triggerStatus.type === 'err') return 'var(--pink)';
     return 'var(--lime)';
   };
+
+  const safeReports = Array.isArray(reports) ? reports : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
@@ -135,32 +138,32 @@ export default function ReportsTab({ timeZone }) {
           </div>
 
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {reports.map((r, idx) => (
+            {safeReports?.map((r, idx) => (
               <div
                 key={idx}
-                onClick={() => handleSelectReport(r.filename)}
+                onClick={() => handleSelectReport(r?.filename)}
                 style={{
                   padding: '11px 14px',
                   borderBottom: '1px solid rgba(255,255,255,0.02)',
-                  background: selectedReport === r.filename ? 'rgba(184,245,66,0.06)' : 'transparent',
-                  borderLeft: selectedReport === r.filename ? '3px solid var(--lime)' : '3px solid transparent',
+                  background: selectedReport === r?.filename ? 'rgba(184,245,66,0.06)' : 'transparent',
+                  borderLeft: selectedReport === r?.filename ? '3px solid var(--lime)' : '3px solid transparent',
                   cursor: 'pointer',
                   transition: 'background 0.2s'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                   
-                  <span style={{ fontSize: '0.8rem', fontFamily: 'JetBrains Mono', wordBreak: 'break-word', color: selectedReport === r.filename ? 'var(--lime-soft)' : 'var(--text-main)' }}>
-                    {r.filename.replace('updates/', '')}
+                  <span style={{ fontSize: '0.8rem', fontFamily: 'JetBrains Mono', wordBreak: 'break-word', color: selectedReport === r?.filename ? 'var(--lime-soft)' : 'var(--text-main)' }}>
+                    {(r?.filename || '').replace('updates/', '')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', paddingLeft: '21px' }}>
-                  <span>{formatSize(r.size)}</span>
-                  <span>{formatTimeToggle(r.mtime * 1000, timeZone, true)}</span>
+                  <span>{formatSize(r?.size || 0)}</span>
+                  <span>{formatTimeToggle((r?.mtime || 0) * 1000, timeZone, true)}</span>
                 </div>
               </div>
             ))}
-            {reports.length === 0 && (
+            {safeReports.length === 0 && (
               <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', fontFamily: 'JetBrains Mono' }}>
                 No reports in archive.
               </div>
@@ -198,5 +201,13 @@ export default function ReportsTab({ timeZone }) {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
+  );
+}
+
+export default function ReportsTab(props) {
+  return (
+    <ErrorBoundary>
+      <ReportsTabContent {...props} />
+    </ErrorBoundary>
   );
 }

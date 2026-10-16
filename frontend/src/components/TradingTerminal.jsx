@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AdvancedRealTimeChart } from 'react-ts-tradingview-widgets';
+import ErrorBoundary from './ErrorBoundary';
 
 const ALL_TICKERS = ["SPX", "BTC", "GLD", "WTI", "NVDA", "TSLA", "DELL", "SPCE"];
 
@@ -17,10 +18,10 @@ const getSymbol = (ticker) => {
     return map[ticker] || `NASDAQ:${ticker}`;
 };
 
-const TradingTerminal = () => {
+const TradingTerminalContent = () => {
     const [activeTickers, setActiveTickers] = useState([]);
     const [selectedTicker, setSelectedTicker] = useState("SPX");
-    const [interval, setInterval] = useState("D"); // Default to D for TradingView
+    const [chartInterval, setChartInterval] = useState("D"); // Default to D for TradingView
     const [loading, setLoading] = useState(false);
     const [portfolio, setPortfolio] = useState({ equity: 100000, positions: {}, win_rate: 0 });
     const [ledger, setLedger] = useState([]);
@@ -31,10 +32,11 @@ const TradingTerminal = () => {
         fetch('/api/trading_settings')
             .then(r => r.json())
             .then(data => {
-                if (data && data.active_tickers) {
-                    setActiveTickers(data.active_tickers.map(t => t.toUpperCase()));
+                if (data && Array.isArray(data.active_tickers)) {
+                    setActiveTickers(data.active_tickers.map(t => (t ? t.toUpperCase() : '')));
                 }
-            });
+            })
+            .catch(console.error);
     }, []);
 
     const toggleTicker = async (ticker) => {
@@ -61,13 +63,15 @@ const TradingTerminal = () => {
                     if (data) {
                         if (data.portfolio) {
                             setPortfolio({
-                                equity: data.portfolio.total_equity || data.portfolio.equity || 100000,
+                                equity: data.portfolio.total_equity ?? data.portfolio.equity ?? 100000,
                                 positions: data.portfolio.positions || {},
-                                win_rate: data.portfolio.win_rate || 0
+                                win_rate: data.portfolio.win_rate ?? 0
                             });
                         }
-                        if (data.ledger) {
+                        if (Array.isArray(data.ledger)) {
                             setLedger(data.ledger);
+                        } else {
+                            setLedger([]);
                         }
                     }
                 })
@@ -102,8 +106,8 @@ const TradingTerminal = () => {
                                         type="checkbox" 
                                         checked={isActive} 
                                         onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleTicker(ticker);
+                                             e.stopPropagation();
+                                             toggleTicker(ticker);
                                         }}
                                         style={{ opacity: 0, width: 0, height: 0 }} 
                                     />
@@ -134,15 +138,15 @@ const TradingTerminal = () => {
                         </div>
                     </div>
                     {fundamentals && fundamentals[selectedTicker] && fundamentals[selectedTicker].reasoning !== "Not an equity." && (
-                        <div style={{ padding: '8px 12px', background: 'var(--bg-panel)', border: `1px solid ${fundamentals[selectedTicker].conviction_score > 0 ? 'var(--term-green)' : (fundamentals[selectedTicker].conviction_score < 0 ? 'var(--term-red)' : 'var(--border-color)')}`, borderRadius: '4px', maxWidth: '500px' }}>
+                        <div style={{ padding: '8px 12px', background: 'var(--bg-panel)', border: `1px solid ${(fundamentals[selectedTicker].conviction_score || 0) > 0 ? 'var(--term-green)' : ((fundamentals[selectedTicker].conviction_score || 0) < 0 ? 'var(--term-red)' : 'var(--border-color)')}`, borderRadius: '4px', maxWidth: '500px' }}>
                             <div style={{ marginBottom: '4px' }}>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '8px' }}>Fundamental Agent Conviction:</span>
-                                <span style={{ fontWeight: 'bold', color: fundamentals[selectedTicker].conviction_score > 0 ? 'var(--term-green)' : (fundamentals[selectedTicker].conviction_score < 0 ? 'var(--term-red)' : 'var(--text-bright)') }}>
-                                    {(fundamentals[selectedTicker].conviction_score > 0 ? '+' : '') + fundamentals[selectedTicker].conviction_score.toFixed(2)}
+                                <span style={{ fontWeight: 'bold', color: (fundamentals[selectedTicker].conviction_score || 0) > 0 ? 'var(--term-green)' : ((fundamentals[selectedTicker].conviction_score || 0) < 0 ? 'var(--term-red)' : 'var(--text-bright)') }}>
+                                    {((fundamentals[selectedTicker].conviction_score || 0) > 0 ? '+' : '') + (fundamentals[selectedTicker].conviction_score ?? 0).toFixed(2)}
                                 </span>
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
-                                {fundamentals[selectedTicker].reasoning}
+                                {fundamentals[selectedTicker].reasoning || 'No analysis available.'}
                             </div>
                         </div>
                     )}
@@ -171,20 +175,21 @@ const TradingTerminal = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h2>[ ACTIVE POSITIONS & STATS ]</h2>
                         <div style={{ display: 'flex', gap: '24px' }}>
-                            <span>EQUITY: <b className="text-cyan">${portfolio.equity.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
-                            <span>WIN RATE: <b className="text-cyan">{(portfolio.win_rate * 100).toFixed(1)}%</b></span>
+                            <span>EQUITY: <b className="text-cyan">${(portfolio?.equity ?? 100000).toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
+                            <span>WIN RATE: <b className="text-cyan">{(((portfolio?.win_rate ?? 0)) * 100).toFixed(1)}%</b></span>
                         </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '16px' }}>
-                        {Object.keys(portfolio.positions || {}).map(pos => {
+                        {Object.keys(portfolio?.positions || {}).map(pos => {
                             if (pos === "cash") return null;
                             const amt = portfolio.positions[pos];
-                            if (amt === 0) return null;
+                            if (!amt) return null;
+                            const numAmt = typeof amt === 'number' ? amt : parseFloat(amt) || 0;
                             return (
                                 <div key={pos} style={{ background: 'var(--bg-hover)', padding: '8px', border: '1px solid var(--border-color)', borderLeft: '2px solid var(--term-cyan)' }}>
                                     <div className="stat-label">{pos} Position</div>
-                                    <div className="stat-value" style={{ color: amt > 0 ? 'var(--term-green)' : 'var(--term-red)' }}>{amt.toFixed(4)}</div>
+                                    <div className="stat-value" style={{ color: numAmt > 0 ? 'var(--term-green)' : 'var(--term-red)' }}>{numAmt?.toFixed(4)}</div>
                                 </div>
                             );
                         })}
@@ -204,14 +209,14 @@ const TradingTerminal = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {ledger.slice(0, 50).map((row, i) => (
+                                {(Array.isArray(ledger) ? ledger : []).slice(0, 50).map((row, i) => (
                                     <tr key={i} className="table-row-item">
-                                        <td className="text-muted">{row.timestamp}</td>
-                                        <td className={row.action === 'BUY' ? 'text-green' : 'text-red'}>{row.action}</td>
-                                        <td className="text-bright">{row.ticker}</td>
-                                        <td>${row.price}</td>
-                                        <td className="text-main">${row.value}</td>
-                                        <td className="text-muted">{row.stats || '-'}</td>
+                                        <td className="text-muted">{row?.timestamp || '-'}</td>
+                                        <td className={row?.action === 'BUY' ? 'text-green' : 'text-red'}>{row?.action || '-'}</td>
+                                        <td className="text-bright">{row?.ticker || '-'}</td>
+                                        <td>${row?.price ?? '-'}</td>
+                                        <td className="text-main">${row?.value ?? '-'}</td>
+                                        <td className="text-muted">{row?.stats || '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -223,4 +228,10 @@ const TradingTerminal = () => {
     );
 };
 
-export default TradingTerminal;
+export default function TradingTerminal(props) {
+    return (
+        <ErrorBoundary>
+            <TradingTerminalContent {...props} />
+        </ErrorBoundary>
+    );
+}

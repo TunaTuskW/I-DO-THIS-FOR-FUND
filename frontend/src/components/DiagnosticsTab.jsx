@@ -1,7 +1,8 @@
 import { formatTimeToggle } from "../utils/timeFormatter";
 import React, { useState, useEffect, useRef } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 
-export default function DiagnosticsTab({ timeZone }) {
+function DiagnosticsTabContent({ timeZone }) {
   const [logs, setLogs] = useState([]);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const terminalEndRef = useRef(null);
@@ -11,7 +12,7 @@ export default function DiagnosticsTab({ timeZone }) {
       const res = await fetch('/api/logs');
       if (res.ok) {
         const json = await res.json();
-        setLogs(json.logs || []);
+        setLogs(Array.isArray(json?.logs) ? json.logs : []);
       }
     } catch (e) {
       console.error("Failed to fetch logs");
@@ -38,6 +39,8 @@ export default function DiagnosticsTab({ timeZone }) {
       default: return 'var(--text-muted)';
     }
   };
+
+  const safeLogs = Array.isArray(logs) ? logs : [];
 
   return (
     <div className="grid-layout">
@@ -73,22 +76,22 @@ export default function DiagnosticsTab({ timeZone }) {
           border: '1px solid var(--glass-border)',
           boxShadow: 'inset 0 0 20px rgba(0,255,224,0.02)'
         }}>
-          {logs.length === 0 ? (
+          {safeLogs.length === 0 ? (
             <div style={{ color: 'var(--text-muted)' }}>Awaiting system events...</div>
           ) : (
-            logs.map((log, i) => (
+            safeLogs?.map((log, i) => (
               <div key={i} className="terminal-log" style={{ display: 'flex', gap: '12px' }}>
                 <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  {formatTimeToggle(log.timestamp, timeZone, false)}
+                  {formatTimeToggle(log?.timestamp, timeZone, false)}
                 </span>
-                <span style={{ color: getLogColor(log.level), width: '60px', fontWeight: 'bold' }}>
-                  {log.level}
+                <span style={{ color: getLogColor(log?.level), width: '60px', fontWeight: 'bold' }}>
+                  {log?.level}
                 </span>
                 <span style={{ color: 'var(--text-muted)', width: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  [{log.component}]
+                  [{log?.component}]
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.9)', wordBreak: 'break-all' }}>
-                  {log.message}
+                  {log?.message}
                 </span>
               </div>
             ))
@@ -97,5 +100,13 @@ export default function DiagnosticsTab({ timeZone }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DiagnosticsTab(props) {
+  return (
+    <ErrorBoundary>
+      <DiagnosticsTabContent {...props} />
+    </ErrorBoundary>
   );
 }

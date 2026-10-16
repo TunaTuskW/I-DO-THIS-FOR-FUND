@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import ErrorBoundary from './ErrorBoundary';
 
 function FeatureBar({ label, value, max = 5 }) {
-  const pct = Math.min(Math.abs(value) / max, 1) * 100;
-  const isNeg = value < 0;
+  const numVal = typeof value === 'number' ? value : (parseFloat(value) || 0);
+  const pct = Math.min(Math.abs(numVal) / max, 1) * 100;
+  const isNeg = numVal < 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(0,0,0,0.25)', padding: '10px 12px', borderRadius: '8px', borderLeft: `2px solid ${isNeg ? 'var(--pink-deep)' : 'var(--lime-dim)'}` }}>
       <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'Space Grotesk' }}>{label}</span>
-      <span style={{ fontFamily: 'JetBrains Mono', color: isNeg ? 'var(--pink-soft)' : 'var(--lime)', fontSize: '1.05rem', fontWeight: 700 }}>{value?.toFixed(4)}</span>
+      <span style={{ fontFamily: 'JetBrains Mono', color: isNeg ? 'var(--pink-soft)' : 'var(--lime)', fontSize: '1.05rem', fontWeight: 700 }}>{numVal?.toFixed(4)}</span>
       <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '2px' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: isNeg ? 'var(--pink-deep)' : 'var(--lime-dim)', borderRadius: '2px', transition: 'width 0.8s ease', boxShadow: `0 0 6px ${isNeg ? 'rgba(192,53,90,0.5)' : 'rgba(184,245,66,0.5)'}` }} />
       </div>
@@ -17,12 +18,13 @@ function FeatureBar({ label, value, max = 5 }) {
 }
 
 function RegimeBar({ label, value, color }) {
-  const pct = Math.min((value || 0) * 100, 100);
+  const numVal = typeof value === 'number' ? value : (parseFloat(value) || 0);
+  const pct = Math.min(Math.max(numVal * 100, 0), 100);
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
         <span style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>{label}</span>
-        <span style={{ color, fontFamily: 'JetBrains Mono', fontSize: '0.9rem', fontWeight: 700 }}>{pct.toFixed(1)}%</span>
+        <span style={{ color, fontFamily: 'JetBrains Mono', fontSize: '0.9rem', fontWeight: 700 }}>{(pct ?? 0).toFixed(1)}%</span>
       </div>
       <div className="progress-bg" style={{ marginBottom: '20px' }}>
         <div className="progress-fill" style={{ width: `${pct}%`, background: color, boxShadow: `0 0 8px ${color}55` }} />
@@ -62,8 +64,8 @@ function MathModelTabContent({ timeZone }) {
   }
 
   const { data_science_layer, kalman_state, mlp_deep_state, regime, trend_state, smc_state, liquidity_state } = modelData;
-  const featuresList = data_science_layer?.ordered_features_list || [];
-  const featuresVector = data_science_layer?.features_vector || [];
+  const featuresList = Array.isArray(data_science_layer?.ordered_features_list) ? data_science_layer.ordered_features_list : [];
+  const featuresVector = Array.isArray(data_science_layer?.features_vector) ? data_science_layer.features_vector : [];
   const epistemic = data_science_layer?.epistemic_metrics || {};
   const kelly = epistemic?.kelly_exposure_fraction || {};
 
@@ -88,7 +90,7 @@ function MathModelTabContent({ timeZone }) {
           Real-time standardized feature vector processed by the ML pipeline.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px' }}>
-          {featuresList.map((feat, i) => (
+          {featuresList?.map((feat, i) => (
             <FeatureBar key={feat} label={feat} value={featuresVector[i] ?? 0} />
           ))}
         </div>
@@ -99,7 +101,7 @@ function MathModelTabContent({ timeZone }) {
         <div className="glass-panel col-span-6 animate-fade-in delay-1">
           <h2> Epistemic Metrics</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontFamily: 'JetBrains Mono' }}>
-            {epistemic.brier_score !== undefined && (
+            {epistemic.brier_score != null && (
               <div className="data-item">
                 <span className="text-muted" style={{ fontSize: '0.82rem' }}>Brier Score</span>
                 <span style={{ color: epistemic.brier_score < 0.25 ? 'var(--lime)' : 'var(--plasma-amber)', fontWeight: 700 }}>
@@ -107,16 +109,16 @@ function MathModelTabContent({ timeZone }) {
                 </span>
               </div>
             )}
-            {epistemic.forecast_accuracy !== undefined && (
+            {epistemic.forecast_accuracy != null && (
               <div className="data-item">
                 <span className="text-muted" style={{ fontSize: '0.82rem' }}>Forecast Accuracy</span>
-                <span style={{ color: 'var(--lime)', fontWeight: 700 }}>{(epistemic.forecast_accuracy * 100).toFixed(1)}%</span>
+                <span style={{ color: 'var(--lime)', fontWeight: 700 }}>{((epistemic.forecast_accuracy * 100) || 0).toFixed(1)}%</span>
               </div>
             )}
             {typeof kelly === 'object' && Object.entries(kelly).map(([k, v]) => (
               <div className="data-item" key={k}>
                 <span className="text-muted" style={{ fontSize: '0.82rem' }}>{k}</span>
-                <span style={{ color: v > 0.1 ? 'var(--lime)' : 'var(--pink-soft)', fontWeight: 700 }}>{(v * 100).toFixed(2)}%</span>
+                <span style={{ color: v > 0.1 ? 'var(--lime)' : 'var(--pink-soft)', fontWeight: 700 }}>{((v * 100) || 0).toFixed(2)}%</span>
               </div>
             ))}
           </div>
@@ -128,14 +130,14 @@ function MathModelTabContent({ timeZone }) {
         <h2> Active Regime</h2>
         <div style={{ marginBottom: '16px' }}>
           <p style={{ fontFamily: 'JetBrains Mono', color: 'var(--lime)', fontSize: '1.5rem', fontWeight: 700, marginBottom: '4px' }}>
-            {dominantRegime.replace(/_/g, ' ')}
+            {(dominantRegime || '')?.replace(/_/g, ' ')}
           </p>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>
-            Confidence: <span style={{ color: 'var(--lime)' }}>{(regimeConf * 100).toFixed(1)}%</span>
+            Confidence: <span style={{ color: 'var(--lime)' }}>{((regimeConf * 100) || 0).toFixed(1)}%</span>
           </span>
         </div>
         {Object.entries(regimeProbs).map(([label, prob]) => (
-          <RegimeBar key={label} label={label.replace(/_/g, ' ')} value={prob} color={label.includes('RISK_ON') ? 'var(--lime)' : label.includes('STAGFLATION') ? 'var(--pink-deep)' : 'var(--plasma-amber)'} />
+          <RegimeBar key={label} label={(label || '')?.replace(/_/g, ' ')} value={prob} color={label.includes('RISK_ON') ? 'var(--lime)' : label.includes('STAGFLATION') ? 'var(--pink-deep)' : 'var(--plasma-amber)'} />
         ))}
       </div>
 
@@ -154,10 +156,10 @@ function MathModelTabContent({ timeZone }) {
               <span style={{ color: 'var(--plasma-amber)', fontSize: '0.8rem', fontFamily: 'JetBrains Mono' }}>High structural ambiguity detected in covariance matrix.</span>
             </div>
           )}
-          {kalman_state?.gain !== undefined && (
+          {kalman_state?.gain != null && (
             <div style={{ marginTop: '14px', display: 'flex', gap: '16px', fontFamily: 'JetBrains Mono', fontSize: '0.8rem' }}>
               <span className="text-muted">Kalman Gain: <span style={{ color: 'var(--lime)' }}>{kalman_state.gain?.toFixed(4)}</span></span>
-              {kalman_state?.innovation !== undefined && (
+              {kalman_state?.innovation != null && (
                 <span className="text-muted">Innovation: <span style={{ color: 'var(--lime)' }}>{kalman_state.innovation?.toFixed(4)}</span></span>
               )}
             </div>
@@ -171,9 +173,9 @@ function MathModelTabContent({ timeZone }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: 'JetBrains Mono', fontSize: '0.82rem' }}>
               {Object.entries(smc_state).map(([k, v]) => (
                 <div className="data-item" key={k}>
-                  <span className="text-muted" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.08em' }}>{k.replace(/_/g, ' ')}</span>
+                  <span className="text-muted" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.08em' }}>{(k || '')?.replace(/_/g, ' ')}</span>
                   <span style={{ color: v === true ? 'var(--lime)' : v === false ? 'var(--pink-deep)' : typeof v === 'number' ? (v > 0 ? 'var(--lime)' : v < 0 ? 'var(--pink)' : 'var(--text-muted)') : 'var(--text-main)' }}>
-                    {typeof v === 'boolean' ? (v ? 'YES' : 'NO') : typeof v === 'number' ? v.toFixed(4) : String(v)}
+                    {typeof v === 'boolean' ? (v ? 'YES' : 'NO') : typeof v === 'number' ? v?.toFixed(4) : String(v)}
                   </span>
                 </div>
               ))}
@@ -188,9 +190,9 @@ function MathModelTabContent({ timeZone }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: 'JetBrains Mono', fontSize: '0.82rem' }}>
               {Object.entries(trend_state).map(([k, v]) => (
                 <div className="data-item" key={k}>
-                  <span className="text-muted" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.08em' }}>{k.replace(/_/g, ' ')}</span>
+                  <span className="text-muted" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.08em' }}>{(k || '')?.replace(/_/g, ' ')}</span>
                   <span style={{ color: typeof v === 'string' && v.includes('UP') ? 'var(--lime)' : typeof v === 'string' && v.includes('DOWN') ? 'var(--pink)' : 'var(--text-main)' }}>
-                    {typeof v === 'number' ? v.toFixed(4) : String(v)}
+                    {typeof v === 'number' ? v?.toFixed(4) : String(v)}
                   </span>
                 </div>
               ))}
@@ -205,8 +207,9 @@ function MathModelTabContent({ timeZone }) {
           <h2> MLP Deep Neural Net — Consensus</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {mlp_deep_state && Object.entries(mlp_deep_state).map(([asset, preds]) => {
-              const bullP = (preds.bull_probability || 0) * 100;
-              const bearP = (preds.bear_probability || 0) * 100;
+              if (!preds || typeof preds !== 'object') return null;
+              const bullP = ((preds.bull_probability ?? 0)) * 100;
+              const bearP = ((preds.bear_probability ?? 0)) * 100;
               const bias = bullP > bearP ? 'BULL' : 'BEAR';
               return (
                 <div key={asset} style={{ background: 'rgba(0,0,0,0.2)', padding: '14px 16px', borderRadius: '8px', border: '1px solid rgba(184,245,66,0.06)' }}>
@@ -220,11 +223,11 @@ function MathModelTabContent({ timeZone }) {
                   <div style={{ display: 'flex', gap: '24px', fontFamily: 'JetBrains Mono' }}>
                     <div>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>BULL</span>
-                      <span style={{ color: 'var(--lime)', fontWeight: 700, fontSize: '1.1rem' }}>{bullP.toFixed(1)}%</span>
+                      <span style={{ color: 'var(--lime)', fontWeight: 700, fontSize: '1.1rem' }}>{bullP?.toFixed(1)}%</span>
                     </div>
                     <div>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>BEAR</span>
-                      <span style={{ color: 'var(--pink-deep)', fontWeight: 700, fontSize: '1.1rem' }}>{bearP.toFixed(1)}%</span>
+                      <span style={{ color: 'var(--pink-deep)', fontWeight: 700, fontSize: '1.1rem' }}>{bearP?.toFixed(1)}%</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                       <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>

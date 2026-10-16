@@ -121,3 +121,18 @@ class RegimeEnsemble:
         transition_risk = min(1.0, variance * 1.5)
         
         return probs, dominant_regime, transition_risk, None
+
+
+# Re-export / forward compute_mcs and run_kalman_filter for pipeline integration
+from src.engines.feature_engine import compute_mcs
+from src.engines.risk_engine import RiskEngine
+
+_risk_engine_instance = None
+
+def run_kalman_filter(mcs: float, sub_components: Dict, hmm_regime_probs: Dict, prior_state=None, prior_cov=None):
+    """Invokes Kalman filter estimation from RiskEngine."""
+    global _risk_engine_instance
+    if _risk_engine_instance is None:
+        _risk_engine_instance = RiskEngine()
+    return _risk_engine_instance.run_kalman_filter(mcs, sub_components, hmm_regime_probs, prior_state, prior_cov)
+

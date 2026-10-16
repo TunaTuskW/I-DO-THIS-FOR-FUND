@@ -1,5 +1,6 @@
 import { formatTimeToggle } from "../utils/timeFormatter";
 import React, { useState, useEffect } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 import { apiPost } from '../App';
 
 const TRADING_DISCLAIMER = `This module is for paper trading (simulated) and future live-order reference only.
@@ -48,7 +49,7 @@ function LivePriceTicker({ tickers = ['SPX', 'BTC', 'GLD', 'WTI'] }) {
             </p>
             {chg !== null && (
               <p style={{ fontSize: '10px', color: up ? 'var(--term-green)' : 'var(--term-red)', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                {up ? '+' : ''}{chg.toFixed(2)}%
+                {up ? '+' : ''}{chg?.toFixed(2)}%
               </p>
             )}
           </div>
@@ -58,7 +59,7 @@ function LivePriceTicker({ tickers = ['SPX', 'BTC', 'GLD', 'WTI'] }) {
   );
 }
 
-export default function PaperTradingTab({ timeZone }) {
+function PaperTradingTabContent({ timeZone }) {
   const [viewType, setViewType] = useState('live');
   const [disabledTickers, setDisabledTickers] = useState([]);
 
@@ -130,8 +131,9 @@ export default function PaperTradingTab({ timeZone }) {
     }
   };
 
-  const { portfolio, ledger } = data;
-  const pnl = portfolio.total_equity - 10000.0;
+  const portfolio = data?.portfolio || { total_equity: 10000.0, cash: 10000.0, positions: {}, win_rate: 0 };
+  const ledger = Array.isArray(data?.ledger) ? data.ledger : [];
+  const pnl = (portfolio.total_equity ?? 10000.0) - 10000.0;
   const pnlPct = (pnl / 10000.0) * 100;
 
   return (
@@ -189,21 +191,21 @@ export default function PaperTradingTab({ timeZone }) {
         <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '8px' }}>
           <div>
             <p className="stat-label">Total Equity</p>
-            <p className="stat-value">${portfolio.total_equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="stat-value">${(portfolio?.total_equity ?? 10000.0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
           <div>
             <p className="stat-label">Available Cash</p>
             <p className="stat-value text-green">
-              ${portfolio.cash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ${(portfolio?.cash ?? 10000.0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
           <div>
             <p className="stat-label">Total PnL</p>
             <p className={`stat-value ${pnl >= 0 ? 'text-green' : 'text-red'}`}>
-              {pnl >= 0 ? '+' : '-'}${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2 })} <span style={{ fontSize: '10px' }}>({pnlPct.toFixed(2)}%)</span>
+              {pnl >= 0 ? '+' : '-'}${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2 })} <span style={{ fontSize: '10px' }}>({(pnlPct ?? 0).toFixed(2)}%)</span>
             </p>
           </div>
-          {portfolio.realized_pnl !== undefined && (
+          {portfolio?.realized_pnl != null && (
             <div>
               <p className="stat-label">Realized PnL</p>
               <p className={`stat-value ${portfolio.realized_pnl >= 0 ? 'text-green' : 'text-red'}`}>
@@ -211,7 +213,7 @@ export default function PaperTradingTab({ timeZone }) {
               </p>
             </div>
           )}
-          {portfolio.unrealized_pnl !== undefined && (
+          {portfolio?.unrealized_pnl != null && (
             <div>
               <p className="stat-label">Unrealized PnL</p>
               <p className={`stat-value ${portfolio.unrealized_pnl >= 0 ? 'text-green' : 'text-red'}`}>
@@ -219,57 +221,57 @@ export default function PaperTradingTab({ timeZone }) {
               </p>
             </div>
           )}
-          {portfolio.win_rate !== undefined && (
+          {portfolio?.win_rate != null && (
             <div>
               <p className="stat-label">Active Win Rate</p>
-              <p className={`stat-value ${portfolio.win_rate >= 50 ? 'text-green' : 'text-amber'}`}>
-                {portfolio.win_rate.toFixed(1)}%
+              <p className={`stat-value ${(portfolio.win_rate || 0) >= 50 ? 'text-green' : 'text-amber'}`}>
+                {(portfolio.win_rate ?? 0).toFixed(1)}%
               </p>
-              {portfolio.active_wins !== undefined && (
+              {portfolio?.active_wins != null && (
                 <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                   {portfolio.active_wins}W / {portfolio.active_losses}L / {portfolio.preservation_events}P
                 </p>
               )}
             </div>
           )}
-          {portfolio.total_fees_paid !== undefined && (
+          {portfolio?.total_fees_paid != null && (
             <div>
               <p className="stat-label">Slippage + Fees</p>
               <p className="stat-value text-amber">
-                ${portfolio.total_fees_paid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                ${(portfolio.total_fees_paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
             </div>
           )}
         </div>
 
         {/* New metrics row: Sharpe, Alpha, Max Drawdown, Benchmark */}
-        {portfolio.sharpe_ratio !== undefined && (
+        {portfolio?.sharpe_ratio != null && (
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
             <div>
               <p className="stat-label">Sharpe Ratio</p>
-              <p className={`stat-value ${portfolio.sharpe_ratio >= 1.0 ? 'text-green' : portfolio.sharpe_ratio >= 0.5 ? 'text-amber' : 'text-red'}`}>
-                {portfolio.sharpe_ratio.toFixed(2)}
+              <p className={`stat-value ${(portfolio.sharpe_ratio || 0) >= 1.0 ? 'text-green' : (portfolio.sharpe_ratio || 0) >= 0.5 ? 'text-amber' : 'text-red'}`}>
+                {(portfolio.sharpe_ratio ?? 0).toFixed(2)}
               </p>
             </div>
             <div>
               <p className="stat-label">Alpha vs SPX</p>
-              <p className={`stat-value ${portfolio.alpha_vs_spx >= 0 ? 'text-green' : 'text-red'}`}>
-                {portfolio.alpha_vs_spx >= 0 ? '+' : ''}{portfolio.alpha_vs_spx.toFixed(2)}%
+              <p className={`stat-value ${(portfolio.alpha_vs_spx || 0) >= 0 ? 'text-green' : 'text-red'}`}>
+                {(portfolio.alpha_vs_spx || 0) >= 0 ? '+' : ''}{(portfolio.alpha_vs_spx ?? 0).toFixed(2)}%
               </p>
             </div>
             <div>
               <p className="stat-label">Max Drawdown</p>
-              <p className={`stat-value ${portfolio.max_drawdown <= 10 ? 'text-green' : portfolio.max_drawdown <= 20 ? 'text-amber' : 'text-red'}`}>
-                {portfolio.max_drawdown.toFixed(1)}%
+              <p className={`stat-value ${(portfolio.max_drawdown || 0) <= 10 ? 'text-green' : (portfolio.max_drawdown || 0) <= 20 ? 'text-amber' : 'text-red'}`}>
+                {(portfolio.max_drawdown ?? 0).toFixed(1)}%
               </p>
             </div>
             <div>
               <p className="stat-label">SPX Benchmark</p>
               <p className="stat-value text-muted">
-                {portfolio.benchmark_return >= 0 ? '+' : ''}{portfolio.benchmark_return.toFixed(2)}%
+                {(portfolio.benchmark_return || 0) >= 0 ? '+' : ''}{(portfolio.benchmark_return ?? 0).toFixed(2)}%
               </p>
             </div>
-            {portfolio.circuit_breaker_count > 0 && (
+            {(portfolio.circuit_breaker_count || 0) > 0 && (
               <div>
                 <p className="stat-label">Circuit Breakers</p>
                 <p className="stat-value text-red">
@@ -277,7 +279,7 @@ export default function PaperTradingTab({ timeZone }) {
                 </p>
               </div>
             )}
-            {portfolio.conviction_blocks > 0 && (
+            {(portfolio.conviction_blocks || 0) > 0 && (
               <div>
                 <p className="stat-label">Conviction Blocks</p>
                 <p className="stat-value text-purple">
@@ -292,7 +294,7 @@ export default function PaperTradingTab({ timeZone }) {
       {/* Open Positions */}
       <div className="data-panel col-span-4">
         <h2>[ OPEN POSITIONS ]</h2>
-        {Object.keys(portfolio.positions).length === 0 ? (
+        {Object.keys(portfolio?.positions || {}).length === 0 ? (
           <p className="text-muted" style={{ marginTop: '14px', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>No open positions — 100% Cash.</p>
         ) : (
           <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontFamily: 'JetBrains Mono', marginTop: '14px', fontSize: '0.85rem' }}>
@@ -303,10 +305,10 @@ export default function PaperTradingTab({ timeZone }) {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(portfolio.positions).map(([sym, shares]) => (
+              {Object.entries(portfolio?.positions || {}).map(([sym, shares]) => (
                 <tr key={sym} className="table-row-item">
                   <td style={{ padding: '10px 14px', fontWeight: 700, color: '#fff' }}>{sym}</td>
-                  <td style={{ padding: '10px 14px', color: 'var(--lime)' }}>{parseFloat(shares).toFixed(4)}</td>
+                  <td style={{ padding: '10px 14px', color: 'var(--lime)' }}>{(parseFloat(shares) || 0).toFixed(4)}</td>
                 </tr>
               ))}
             </tbody>
@@ -383,20 +385,20 @@ export default function PaperTradingTab({ timeZone }) {
               </tr>
             </thead>
             <tbody>
-                {ledger.map((trade, i) => (
+                {(Array.isArray(ledger) ? ledger : []).map((trade, i) => (
                   <tr key={i} className="table-row-item">
                     <td className="text-muted">
-                      {trade.timestamp ? formatTimeToggle(trade.timestamp, timeZone) : '-'}
+                      {trade?.timestamp ? formatTimeToggle(trade.timestamp, timeZone) : '-'}
                     </td>
-                    <td className={trade.action === 'BUY' ? 'text-green' : 'text-red'}>{trade.action}</td>
-                    <td className="text-bright">{trade.ticker}</td>
-                    <td>{parseFloat(trade.shares).toFixed(4)}</td>
-                    <td>${parseFloat(trade.price).toFixed(2)}</td>
-                    <td className="text-main">${parseFloat(trade.value).toFixed(2)}</td>
+                    <td className={trade?.action === 'BUY' ? 'text-green' : 'text-red'}>{trade?.action || '-'}</td>
+                    <td className="text-bright">{trade?.ticker || '-'}</td>
+                    <td>{(parseFloat(trade?.shares) || 0).toFixed(4)}</td>
+                    <td>${(parseFloat(trade?.price) || 0).toFixed(2)}</td>
+                    <td className="text-main">${(parseFloat(trade?.value) || 0).toFixed(2)}</td>
                     <td className="text-muted">
-                      {trade.pnl !== undefined 
+                      {trade?.pnl != null 
                         ? <><span className={trade.pnl >= 0 ? 'text-green' : 'text-red'}>{trade.pnl >= 0 ? '+' : '-'}${Math.abs(trade.pnl).toFixed(2)}</span> {trade.stats ? ` | ${trade.stats}` : ''}</>
-                        : trade.stats ? trade.stats : trade.fee ? `Fee: $${parseFloat(trade.fee).toFixed(2)}` : '-'}
+                        : trade?.stats ? trade.stats : trade?.fee ? `Fee: $${(parseFloat(trade.fee) || 0).toFixed(2)}` : '-'}
                     </td>
                   </tr>
                 ))}
@@ -408,5 +410,13 @@ export default function PaperTradingTab({ timeZone }) {
 
       <style>{`@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }`}</style>
     </div>
+  );
+}
+
+export default function PaperTradingTab(props) {
+  return (
+    <ErrorBoundary>
+      <PaperTradingTabContent {...props} />
+    </ErrorBoundary>
   );
 }
